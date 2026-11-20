@@ -98,6 +98,9 @@ export interface ChatMessage {
   replyToId?: string;
   replyToSender?: string;
   replyToText?: string;
+  /** Q&A (rooms only): the asker marked this question solved, optionally pointing at the best answer */
+  solved?: boolean;
+  acceptedAnswerId?: string;
   /** One reaction per user: uid -> emoji (must be one of REACTION_EMOJIS) */
   reactions?: Record<string, string>;
   createdAt?: Timestamp;

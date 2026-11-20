@@ -126,6 +126,16 @@ export interface Translations {
   noDirectChatsYet: string;
   groupChatBadge: string;
   privateChatBadge: string;
+  solvedBadge: string;
+  bestAnswerBadge: string;
+  previewRoomName: string;
+  previewQuestion: string;
+  previewAnswer: string;
+  markSolved: string;
+  unmarkSolved: string;
+  markBestAnswer: string;
+  unmarkBestAnswer: string;
+  formatHint: string;
   errPermission: string;
   errOffline: string;
   errOfflineBar: string;
@@ -186,6 +196,14 @@ export interface Translations {
   voiceMicDenied: string;
   voiceUnsupported: string;
   voiceTooLong: string;
+  voiceCantPlay: string;
+  deleteAccount: string;
+  deleteAccountWarning: string;
+  deleteAccountTypeNick: string;
+  deleteAccountConfirm: string;
+  deleteAccountFailed: string;
+  accountDeletedToast: string;
+  voiceDownload: string;
   newMessageNotif: string;
   nicknameHint: string;
   nicknameInvalid: string;
@@ -365,6 +383,16 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     noDirectChatsYet: 'ابحث عن شخص باسم المستخدم وابعتله طلب محادثة.',
     groupChatBadge: 'دردشة جماعية',
     privateChatBadge: 'دردشة خاصة',
+    solvedBadge: 'تم الحل',
+    bestAnswerBadge: 'أفضل إجابة',
+    previewRoomName: 'البرمجة والتطوير',
+    previewQuestion: 'ليش React بيعطيني تحذير لما أعرض قائمة؟ 🤔',
+    previewAnswer: 'لازم تعطي كل عنصر بالقائمة',
+    markSolved: 'تعليم السؤال: تم الحل',
+    unmarkSolved: 'إلغاء «تم الحل»',
+    markBestAnswer: 'اختيار كأفضل إجابة',
+    unmarkBestAnswer: 'إلغاء أفضل إجابة',
+    formatHint: 'للكود: `كود` أو ``` بلوك ```، وللخط العريض: **نص**',
     errPermission: 'ما عندك صلاحية تعمل هالشي.',
     errOffline: 'في مشكلة بالاتصال، عم نحاول مرة ثانية…',
     errOfflineBar: 'أنت غير متصل بالإنترنت. رح نكمّل أول ما يرجع الاتصال.',
@@ -425,6 +453,14 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     voiceMicDenied: 'ما في إذن للمايكروفون. اسمح للموقع يستخدمه من إعدادات المتصفح.',
     voiceUnsupported: 'المتصفح هاد ما بيدعم تسجيل الصوت.',
     voiceTooLong: 'التسجيل طويل كثير، الحد الأقصى دقيقتين.',
+    voiceCantPlay: 'هالجهاز ما بيشغّل هالتسجيل',
+    deleteAccount: 'حذف حسابي نهائياً',
+    deleteAccountWarning: 'رح ينحذف ملفك واسم المستخدم وقائمة الحظر بشكل نهائي، والرسائل اللي بعتّها بتضل ظاهرة باسمك. رح نطلب منك تأكيد تسجيل الدخول بـ Google.',
+    deleteAccountTypeNick: 'للتأكيد اكتب اسم المستخدم تبعك.',
+    deleteAccountConfirm: 'احذف الحساب',
+    deleteAccountFailed: 'ما قدرنا نحذف الحساب، جرّب كمان مرة.',
+    accountDeletedToast: 'انحذف حسابك. مع السلامة 👋',
+    voiceDownload: 'تنزيل',
     newMessageNotif: 'رسالة جديدة',
     nicknameHint: 'حروف إنجليزية صغيرة وأرقام و _ أو . (من 3 لـ 20). لازم يكون فريد، والناس بيلاقوك فيه.',
     nicknameInvalid: 'اسم المستخدم لازم يكون من 3 لـ 20 حرف: حروف إنجليزية صغيرة أو أرقام أو _ أو .',
@@ -437,7 +473,7 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     declineRequest: 'رفض',
     acceptRequest: 'قبول',
     requestOneMessageHint: 'هاد طلب محادثة: بتقدر تبعت رسالة وحدة بس لحد ما يقبل. عرّف عن حالك وعن سبب تواصلك.',
-    searchPeopleHint: 'اكتب اسم المستخدم (@) حتى تلاقي الشخص وتبعتله طلب محادثة.',
+    searchPeopleHint: 'اكتب اسم المستخدم (@) كامل وبالضبط حتى تلاقي الشخص وتبعتله طلب محادثة.',
     searchPeopleNoResults: 'ما في حدا بهاد الاسم.',
     aboutLink: 'عن ماكرون',
     privacyLink: 'الخصوصية',
@@ -602,6 +638,16 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     noDirectChatsYet: 'Find someone by username and send them a chat request.',
     groupChatBadge: 'Group Chat',
     privateChatBadge: 'Private Chat',
+    solvedBadge: 'Solved',
+    bestAnswerBadge: 'Best answer',
+    previewRoomName: 'Programming & Dev',
+    previewQuestion: 'Why does React warn me when I render a list? 🤔',
+    previewAnswer: 'Give every item in the list a unique',
+    markSolved: 'Mark question as solved',
+    unmarkSolved: 'Unmark solved',
+    markBestAnswer: 'Pick as best answer',
+    unmarkBestAnswer: 'Remove best answer',
+    formatHint: 'Code: `inline` or ``` block ```, bold: **text**',
     errPermission: 'You do not have permission to do that.',
     errOffline: 'Connection problem, retrying…',
     errOfflineBar: 'You are offline. We will continue once the connection is back.',
@@ -662,6 +708,14 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     voiceMicDenied: 'Microphone access was denied. Allow it in your browser settings.',
     voiceUnsupported: 'This browser does not support voice recording.',
     voiceTooLong: 'Recording is too long, the limit is 2 minutes.',
+    voiceCantPlay: "This device can't play this recording",
+    deleteAccount: 'Delete my account permanently',
+    deleteAccountWarning: 'Your profile, username and block list will be deleted for good. Messages you already sent stay visible under your name. You will be asked to confirm with Google.',
+    deleteAccountTypeNick: 'To confirm, type your username.',
+    deleteAccountConfirm: 'Delete account',
+    deleteAccountFailed: "Couldn't delete the account, please try again.",
+    accountDeletedToast: 'Your account was deleted. Goodbye 👋',
+    voiceDownload: 'Download',
     newMessageNotif: 'New message',
     nicknameHint: 'Lowercase English letters, numbers, _ or . (3–20). Must be unique; people find you by it.',
     nicknameInvalid: 'Username must be 3–20 characters: lowercase English letters, numbers, _ or .',
@@ -674,7 +728,7 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     declineRequest: 'Decline',
     acceptRequest: 'Accept',
     requestOneMessageHint: 'This is a chat request: you can send one message until it is accepted. Introduce yourself and why you are reaching out.',
-    searchPeopleHint: 'Type a @username to find someone and send a chat request.',
+    searchPeopleHint: 'Type someone\'s exact @username to find them and send a chat request.',
     searchPeopleNoResults: 'No one with that username.',
     aboutLink: 'About',
     privacyLink: 'Privacy',

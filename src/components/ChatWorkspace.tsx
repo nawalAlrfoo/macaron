@@ -3,6 +3,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   limit,
   onSnapshot,
@@ -271,7 +272,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const [otherMembers, setOtherMembers] = useState<UserPublicProfile[]>([]);
   const [searching, setSearching] = useState(false);
   useEffect(() => {
-    if (memberQuery.length < 2) {
+    if (memberQuery.length < 3) {
       setOtherMembers([]);
       return;
     }
@@ -279,33 +280,42 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     setSearching(true);
     const timer = window.setTimeout(async () => {
       try {
-        const snap = await getDocs(
-          query(
-            collection(db, 'users_public'),
-            where('nickname', '>=', memberQuery),
-            where('nickname', '<=', memberQuery + '\uf8ff'),
-            orderBy('nickname'),
-            limit(8)
-          )
-        );
+        let found: UserPublicProfile[] = [];
+        if (isAdmin) {
+          // Admins can browse by prefix
+          const snap = await getDocs(
+            query(
+              collection(db, 'users_public'),
+              where('nickname', '>=', memberQuery),
+              where('nickname', '<=', memberQuery + '\uf8ff'),
+              orderBy('nickname'),
+              limit(8)
+            )
+          );
+          found = snap.docs.map((d) => d.data() as UserPublicProfile);
+        } else {
+          // Members: exact @nickname only, so nobody can walk the member list letter by letter
+          const handle = await getDoc(doc(db, 'nicknames', memberQuery));
+          const uid = handle.exists() ? (handle.data().uid as string) : '';
+          if (uid) {
+            const prof = await getDoc(doc(db, 'users_public', uid));
+            if (prof.exists()) found = [prof.data() as UserPublicProfile];
+          }
+        }
         if (cancelled) return;
-        setOtherMembers(
-          snap.docs
-            .map((d) => d.data() as UserPublicProfile)
-            .filter((m) => m.uid !== myUid && !blockedRef.current.includes(m.uid))
-        );
+        setOtherMembers(found.filter((m) => m.uid !== myUid && !blockedRef.current.includes(m.uid)));
       } catch (err) {
         console.warn('Nickname search failed:', err);
         if (!cancelled) setOtherMembers([]);
       } finally {
         if (!cancelled) setSearching(false);
       }
-    }, 300);
+    }, 400);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [memberQuery, myUid]);
+  }, [memberQuery, myUid, isAdmin]);
 
   const blockedUids = useBlockedUids(myUid);
   blockedRef.current = blockedUids;
@@ -613,9 +623,9 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
             </div>
           )}
 
-          {searching && memberQuery.length >= 2 ? (
+          {searching && memberQuery.length >= 3 ? (
             <p className="px-2.5 text-[11px] text-slate-400 dark:text-slate-500">…</p>
-          ) : memberQuery.length < 2 ? (
+          ) : memberQuery.length < 3 ? (
             <p className="px-2.5 text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed">
               {t.searchPeopleHint}
             </p>

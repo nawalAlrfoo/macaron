@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
 import { unblockUser } from '@/src/lib/moderation';
+import { deleteMyAccount } from '@/src/lib/account';
+import { showToast } from '@/src/lib/toast';
 import {
   Ban,
   Bell,
@@ -14,6 +16,7 @@ import {
   Monitor,
   Moon,
   Sun,
+  Trash2,
   Type,
   Volume2,
   X,
@@ -128,6 +131,25 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   const t = TRANSLATIONS[language];
   const prefs = usePrefs();
   const [copied, setCopied] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const canDelete = deleteConfirm.trim().toLowerCase().replace(/^@/, '') === profile.nickname;
+  const handleDeleteAccount = async () => {
+    if (!canDelete || deleting) return;
+    setDeleting(true);
+    try {
+      await deleteMyAccount();
+      showToast({ kind: 'success', key: 'accountDeletedToast' });
+    } catch (err: any) {
+      const code = err?.code ?? '';
+      if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
+        console.error('Delete account failed:', err);
+        showToast({ kind: 'error', key: 'deleteAccountFailed' });
+      }
+      setDeleting(false);
+    }
+  };
   const notifSupported = typeof window !== 'undefined' && 'Notification' in window;
   const [notifDenied, setNotifDenied] = useState(
     notifSupported && Notification.permission === 'denied'
@@ -341,6 +363,53 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
             <LogOut className="w-4 h-4" />
             <span>{t.signOut}</span>
           </button>
+
+          <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 overflow-hidden">
+            {!deleteOpen ? (
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(true)}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{t.deleteAccount}</span>
+              </button>
+            ) : (
+              <div className="p-4 space-y-3 bg-rose-50/60 dark:bg-rose-950/20">
+                <p className="text-xs leading-relaxed text-rose-700 dark:text-rose-300">{t.deleteAccountWarning}</p>
+                <input
+                  type="text"
+                  dir="ltr"
+                  value={deleteConfirm}
+                  onChange={(e) => setDeleteConfirm(e.target.value)}
+                  placeholder={`@${profile.nickname}`}
+                  aria-label={t.deleteAccountTypeNick}
+                  className="w-full px-3 py-2 rounded-lg text-sm border border-rose-200 dark:border-rose-900/60 bg-white dark:bg-[#11131A] text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-rose-200/50"
+                />
+                <p className="text-[11px] text-rose-600/80 dark:text-rose-300/70">{t.deleteAccountTypeNick}</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteOpen(false);
+                      setDeleteConfirm('');
+                    }}
+                    className="flex-1 px-3 py-2 rounded-lg text-xs font-medium border border-slate-200 dark:border-[#262A36] bg-white dark:bg-[#171A23] text-slate-600 dark:text-slate-300 cursor-pointer"
+                  >
+                    {t.cancelAction}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!canDelete || deleting}
+                    onClick={handleDeleteAccount}
+                    className="flex-1 px-3 py-2 rounded-lg text-xs font-bold bg-rose-600 text-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    {deleting ? '…' : t.deleteAccountConfirm}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -195,7 +195,7 @@ service cloud.firestore {
         && data.keys().hasOnly([
           'id', 'roomId', 'senderUid', 'senderName', 'senderNickname',
           'senderPhoto', 'text', 'imageUrl', 'audioUrl', 'audioDuration', 'replyToId', 'replyToSender', 'replyToText',
-          'reactions', 'createdAt', 'updatedAt'
+          'reactions', 'solved', 'acceptedAnswerId', 'createdAt', 'updatedAt'
         ])
         && isValidId(data.id)
         && data.id == expectedMessageId
@@ -213,6 +213,8 @@ service cloud.firestore {
         && (!('replyToId' in data) || (data.replyToId is string && data.replyToId.size() <= 128))
         && (!('replyToSender' in data) || (data.replyToSender is string && data.replyToSender.size() <= 60))
         && (!('replyToText' in data) || (data.replyToText is string && data.replyToText.size() <= 200))
+        && (!('solved' in data) || data.solved is bool)
+        && (!('acceptedAnswerId' in data) || isValidId(data.acceptedAnswerId))
         && (!('reactions' in data) || (data.reactions is map && data.reactions.size() <= 300))
         && data.createdAt is timestamp
         && data.updatedAt is timestamp;
@@ -290,8 +292,8 @@ service cloud.firestore {
     // 1. Public User Profiles (No PII)
     match /users_public/{userId} {
       allow get: if isValidId(userId) && isVerified();
-      // No open directory: members can only run small searches (by @nickname); admins can list everyone
-      allow list: if isVerified() && (isAdmin() || request.query.limit <= 10);
+      // No open directory: members find people only by exact @nickname (via /nicknames); admins can list everyone
+      allow list: if isAdmin();
 
       allow create: if isValidId(userId)
         && isOwner(userId)
@@ -474,6 +476,11 @@ service cloud.firestore {
               )
             )
             || isValidReactionChange()
+            || (
+              // the person who asked marks their question solved / picks the best answer
+              existing().senderUid == request.auth.uid
+              && incoming().diff(existing()).affectedKeys().hasOnly(['solved', 'acceptedAnswerId'])
+            )
           );
 
         allow delete: if isValidRoomId(roomId)

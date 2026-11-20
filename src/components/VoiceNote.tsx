@@ -7,6 +7,8 @@ interface VoiceNoteProps {
   duration?: number;
   isMine: boolean;
   accent: string;
+  unsupportedLabel?: string;
+  downloadLabel?: string;
 }
 
 const fmt = (secs: number) => {
@@ -17,11 +19,22 @@ const fmt = (secs: number) => {
 // Fixed pseudo-waveform so every note looks like audio without decoding the file
 const BARS = [6, 10, 14, 9, 16, 12, 7, 13, 17, 11, 8, 15, 10, 6, 12, 16, 9, 13, 7, 11, 14, 8, 10, 6];
 
-export const VoiceNote: React.FC<VoiceNoteProps> = ({ src, duration, isMine, accent }) => {
+export const VoiceNote: React.FC<VoiceNoteProps> = ({ src, duration, isMine, accent, unsupportedLabel, downloadLabel }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [total, setTotal] = useState(duration ?? 0);
+  // e.g. a WebM/Opus note recorded on Chrome, opened on an older iPhone
+  const [unsupported, setUnsupported] = useState(() => {
+    if (!src.startsWith('data:audio/')) return false;
+    const end = src.search(/[;,]/);
+    const mime = src.slice(5, end > 0 ? end : undefined);
+    try {
+      return document.createElement('audio').canPlayType(mime) === '';
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     const a = audioRef.current;
@@ -37,7 +50,9 @@ export const VoiceNote: React.FC<VoiceNoteProps> = ({ src, duration, isMine, acc
     a.addEventListener('timeupdate', onTime);
     a.addEventListener('loadedmetadata', onMeta);
     a.addEventListener('durationchange', onMeta);
+    const onError = () => setUnsupported(true);
     a.addEventListener('ended', onEnd);
+    a.addEventListener('error', onError);
     a.addEventListener('pause', () => setPlaying(false));
     a.addEventListener('play', () => setPlaying(true));
     return () => {
@@ -45,6 +60,7 @@ export const VoiceNote: React.FC<VoiceNoteProps> = ({ src, duration, isMine, acc
       a.removeEventListener('loadedmetadata', onMeta);
       a.removeEventListener('durationchange', onMeta);
       a.removeEventListener('ended', onEnd);
+      a.removeEventListener('error', onError);
     };
   }, []);
 
@@ -57,7 +73,9 @@ export const VoiceNote: React.FC<VoiceNoteProps> = ({ src, duration, isMine, acc
       document.querySelectorAll('audio[data-voice-note]').forEach((el) => {
         if (el !== a) (el as HTMLAudioElement).pause();
       });
-      void a.play();
+      a.play().catch((err) => {
+        if (err?.name === 'NotSupportedError') setUnsupported(true);
+      });
     } else {
       a.pause();
     }
@@ -77,6 +95,17 @@ export const VoiceNote: React.FC<VoiceNoteProps> = ({ src, duration, isMine, acc
   const progress = total > 0 ? current / total : 0;
   const played = isMine ? 'rgba(255,255,255,0.95)' : accent;
   const unplayed = isMine ? 'rgba(255,255,255,0.4)' : 'rgba(148,163,184,0.5)';
+
+  if (unsupported) {
+    return (
+      <div className={`flex items-center gap-3 text-xs ${isMine ? 'text-white/85' : 'text-slate-500 dark:text-slate-400'}`}>
+        <span>🎙️ {unsupportedLabel || "Can't play this recording here"}</span>
+        <a href={src} download="macaron-voice" onClick={(e) => e.stopPropagation()} className="underline font-semibold">
+          {downloadLabel || 'Download'}
+        </a>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-3 min-w-[200px] sm:min-w-[240px]" dir="ltr">

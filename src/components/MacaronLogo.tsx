@@ -15,14 +15,14 @@ interface MacaronLogoProps {
   title?: string;
 }
 
-/** Macaron brand mark — a small stacked macaron on a soft pastel tile. */
+/** Macaron brand mark — a small stacked macaron on a calm lavender tile. */
 export const MacaronLogo: React.FC<MacaronLogoProps> = ({
   size = 40,
   className = '',
-  shell = '#F58AC0',
-  filling = '#FEF08A',
-  bgFrom = '#FFF7D6',
-  bgTo = '#DDF1FE',
+  shell = '#7C66DC',
+  filling = '#F6EBD9',
+  bgFrom = '#F4F1FD',
+  bgTo = '#E7E2FA',
   tile = true,
   title,
 }) => {

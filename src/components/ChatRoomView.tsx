@@ -15,6 +15,8 @@ import {
 } from 'firebase/firestore';
 import {
   ArrowDown,
+  Award,
+  CheckCircle2,
   Flag,
   Mic,
   Square,
@@ -103,6 +105,89 @@ function renderLinkifiedText(text: string) {
       <React.Fragment key={i}>{part}</React.Fragment>
     )
   );
+}
+
+/** Inline formatting: `code`, **bold**, and links */
+function renderInline(text: string, keyBase: string, isMine: boolean) {
+  const out: React.ReactNode[] = [];
+  const re = /(`[^`\n]+`|\*\*[^*\n]+\*\*)/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let i = 0;
+  while ((m = re.exec(text))) {
+    if (m.index > last) out.push(<React.Fragment key={`${keyBase}-t${i++}`}>{renderLinkifiedText(text.slice(last, m.index))}</React.Fragment>);
+    const tok = m[0];
+    if (tok.startsWith('`')) {
+      out.push(
+        <code
+          key={`${keyBase}-c${i++}`}
+          dir="ltr"
+          className={`px-1.5 py-0.5 rounded-md font-mono text-[0.85em] ${
+            isMine ? 'bg-white/20' : 'bg-slate-100 dark:bg-[#11131A] text-rose-600 dark:text-rose-300'
+          }`}
+        >
+          {tok.slice(1, -1)}
+        </code>
+      );
+    } else {
+      out.push(<strong key={`${keyBase}-b${i++}`}>{tok.slice(2, -2)}</strong>);
+    }
+    last = m.index + tok.length;
+  }
+  if (last < text.length) out.push(<React.Fragment key={`${keyBase}-t${i++}`}>{renderLinkifiedText(text.slice(last))}</React.Fragment>);
+  return out;
+}
+
+const CodeBlock: React.FC<{ code: string; lang: string; copyLabel: string; copiedLabel: string }> = ({
+  code,
+  lang,
+  copyLabel,
+  copiedLabel,
+}) => {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="my-1.5 rounded-lg overflow-hidden border border-black/10 dark:border-white/10 bg-[#0F1117] text-slate-100" dir="ltr" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center justify-between px-3 py-1 text-[10px] uppercase tracking-wide text-slate-400 bg-white/5">
+        <span>{lang || 'code'}</span>
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(code);
+              setCopied(true);
+              window.setTimeout(() => setCopied(false), 1200);
+            } catch {
+              // ignore
+            }
+          }}
+          className="normal-case text-[11px] text-slate-300 hover:text-white cursor-pointer"
+        >
+          {copied ? copiedLabel : copyLabel}
+        </button>
+      </div>
+      <pre className="px-3 py-2.5 overflow-x-auto text-[12.5px] leading-relaxed font-mono whitespace-pre">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+};
+
+/** ```fenced code``` blocks + inline formatting */
+function renderRichText(text: string, isMine: boolean, copyLabel: string, copiedLabel: string) {
+  const parts = text.split(/```/);
+  // an unmatched fence is shown as plain text
+  if (parts.length % 2 === 0) return renderInline(text, 'p', isMine);
+  return parts.map((part, idx) => {
+    if (idx % 2 === 1) {
+      const nl = part.indexOf('\n');
+      const first = nl === -1 ? '' : part.slice(0, nl).trim();
+      const isLang = /^[a-zA-Z0-9+#.-]{1,15}$/.test(first);
+      const code = (isLang ? part.slice(nl + 1) : part).replace(/^\n+|\n+$/g, '');
+      return <CodeBlock key={`cb${idx}`} code={code} lang={isLang ? first : ''} copyLabel={copyLabel} copiedLabel={copiedLabel} />;
+    }
+    const trimmed = part.replace(/^\n+|\n+$/g, '');
+    return trimmed ? <span key={`s${idx}`}>{renderInline(trimmed, `s${idx}`, isMine)}</span> : null;
+  });
 }
 
 function dayKeyOf(date: Date) {
@@ -593,7 +678,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       recStreamRef.current = stream;
-      const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'].find(
+      const mimeType = ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].find(
         (m) => MediaRecorder.isTypeSupported?.(m)
       );
       const rec = new MediaRecorder(stream, {
@@ -767,6 +852,38 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const blockedSet = useMemo(() => new Set(blockedUids ?? []), [blockedUids]);
+  const msgById = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages]);
+  const acceptedIds = useMemo(
+    () => new Set(messages.map((m) => m.acceptedAnswerId).filter(Boolean) as string[]),
+    [messages]
+  );
+
+  const toggleSolved = async (msg: ChatMessage) => {
+    if (mode !== 'room' || !targetId) return;
+    setActionsOpenFor(null);
+    try {
+      await updateDoc(
+        doc(db, 'rooms', targetId, 'messages', msg.id),
+        msg.solved ? { solved: false, acceptedAnswerId: deleteField() } : { solved: true }
+      );
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `rooms/${targetId}/messages/${msg.id}`);
+    }
+  };
+
+  const pickBestAnswer = async (questionMsg: ChatMessage, answer: ChatMessage) => {
+    if (mode !== 'room' || !targetId) return;
+    setActionsOpenFor(null);
+    const already = questionMsg.acceptedAnswerId === answer.id;
+    try {
+      await updateDoc(
+        doc(db, 'rooms', targetId, 'messages', questionMsg.id),
+        already ? { acceptedAnswerId: deleteField() } : { solved: true, acceptedAnswerId: answer.id }
+      );
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `rooms/${targetId}/messages/${questionMsg.id}`);
+    }
+  };
   const visibleMessages = useMemo(() => {
     const base = blockedSet.size ? messages.filter((m) => !blockedSet.has(m.senderUid)) : messages;
     if (!normalizedQuery) return base;
@@ -876,6 +993,9 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
 
     const isMine = msg.senderUid === myUid;
     const canModify = isMine || (mode === 'room' && isAdmin);
+    const isAccepted = mode === 'room' && acceptedIds.has(msg.id);
+    const question = msg.replyToId ? msgById.get(msg.replyToId) : undefined;
+    const canPickBest = mode === 'room' && !isMine && question?.senderUid === myUid;
     const isEdited =
       msg.createdAt &&
       msg.updatedAt &&
@@ -908,7 +1028,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
           {/* Metadata */}
           <div
             className={`flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mb-1 px-1.5 ${
-              isGrouped ? 'hidden' : ''
+              isGrouped && !msg.solved && !isAccepted ? 'hidden' : ''
             }`}
           >
             <span className="font-semibold text-slate-700 dark:text-slate-200">
@@ -924,13 +1044,27 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
                 <span>{t.editedTag}</span>
               </>
             )}
+            {msg.solved && (
+              <span className="ms-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
+                ✅ {t.solvedBadge}
+              </span>
+            )}
+            {isAccepted && (
+              <span className="ms-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300">
+                ⭐ {t.bestAnswerBadge}
+              </span>
+            )}
           </div>
 
           {/* Bubble */}
           <div
             onClick={() => setActionsOpenFor((cur) => (cur === msg.id ? null : msg.id))}
             className={`relative px-4 py-2.5 text-[0.9rem] leading-relaxed space-y-2 shadow-[0_1px_2px_rgba(15,23,42,0.06)] ${
-              isMine ? 'border border-transparent' : 'border border-slate-200 dark:border-[#262A36]'
+              isAccepted
+                ? 'border-2 border-amber-300 dark:border-amber-500/60'
+                : isMine
+                  ? 'border border-transparent'
+                  : 'border border-slate-200 dark:border-[#262A36]'
             } ${getBubbleRadius(isMine, isGrouped)}`}
             style={{
               backgroundColor: isMine ? myBg : otherBg,
@@ -974,6 +1108,8 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
               <VoiceNote
                 src={msg.audioUrl}
                 duration={msg.audioDuration}
+                unsupportedLabel={t.voiceCantPlay}
+                downloadLabel={t.voiceDownload}
                 isMine={isMine}
                 accent={settings.primaryColor}
               />
@@ -1016,9 +1152,9 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
                 </div>
               </div>
             ) : msg.text ? (
-              <p className="whitespace-pre-wrap break-words" dir="auto">
-                {renderLinkifiedText(msg.text)}
-              </p>
+              <div className="whitespace-pre-wrap break-words" dir="auto">
+                {renderRichText(msg.text, isMine, t.copyAction, t.copiedToast)}
+              </div>
             ) : null}
           </div>
 
@@ -1067,6 +1203,26 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
               >
                 <SmilePlus className="w-3.5 h-3.5" />
               </button>
+              {mode === 'room' && isMine && (
+                <button
+                  type="button"
+                  onClick={() => toggleSolved(msg)}
+                  title={msg.solved ? t.unmarkSolved : t.markSolved}
+                  className={`${actionBtn} ${msg.solved ? '!text-emerald-600' : 'hover:!text-emerald-600'}`}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+              {canPickBest && question && (
+                <button
+                  type="button"
+                  onClick={() => pickBestAnswer(question, msg)}
+                  title={isAccepted ? t.unmarkBestAnswer : t.markBestAnswer}
+                  className={`${actionBtn} ${isAccepted ? '!text-amber-500' : 'hover:!text-amber-500'}`}
+                >
+                  <Award className="w-3.5 h-3.5" />
+                </button>
+              )}
               {!isMine && (
                 <button
                   type="button"
@@ -1466,7 +1622,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
             onPaste={handlePaste}
             onBlur={() => clearTyping(targetId)}
             placeholder={t.typeMessagePlaceholder}
-            title={t.composerHint}
+            title={`${t.composerHint}\n${t.formatHint}`}
             className="flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-relaxed text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none min-w-0 max-h-36 pastel-scroll"
           />
 
@@ -1494,6 +1650,9 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
             </button>
           )}
         </form>
+        )}
+        {mode === 'room' && !recording && text.length > 0 && (
+          <p className="mt-1 px-3 text-[10px] text-slate-400 dark:text-slate-500" dir="auto">{t.formatHint}</p>
         )}
         </>
         )}

@@ -324,7 +324,7 @@ function MacaronApp() {
     );
 
     // Privacy: only admins load the full member directory (for the admin panel).
-    // Everyone else finds people by searching an exact @nickname prefix.
+    // Everyone else finds people by their exact @nickname.
     let unsubMembers = () => {};
     if (isAdmin) {
       unsubMembers = onSnapshot(

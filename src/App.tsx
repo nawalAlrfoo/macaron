@@ -45,6 +45,9 @@ import {
   AdminRecord,
   ChatRoom,
   DEFAULT_ROOMS,
+  LEGACY_ROOM_NAMES_AR,
+  NICKNAME_REGEX,
+  normalizeNickname,
   DEFAULT_SITE_SETTINGS,
   DirectChat,
   Language,
@@ -217,12 +220,28 @@ function MacaronApp() {
   }, [user]);
 
   // Seed default rooms if empty once authenticated & profile exists
-  const ensureDefaultRooms = useCallback(async (uid: string) => {
-    try {
-      const checkGeneral = await getDoc(doc(db, 'rooms', 'general'));
-      if (!checkGeneral.exists()) {
-        for (const r of DEFAULT_ROOMS) {
-          await setDoc(doc(db, 'rooms', r.id), {
+  const ensureDefaultRooms = useCallback(async (uid: string, admin: boolean) => {
+    for (const r of DEFAULT_ROOMS) {
+      try {
+        const ref = doc(db, 'rooms', r.id);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          // Admin sessions rename the original AI Studio rooms to the learning/Q&A rooms
+          const current = snap.data() as ChatRoom;
+          if (admin && LEGACY_ROOM_NAMES_AR[r.id] && current.nameAr === LEGACY_ROOM_NAMES_AR[r.id]) {
+            await updateDoc(ref, {
+              nameAr: r.nameAr,
+              nameEn: r.nameEn,
+              descriptionAr: r.descriptionAr,
+              descriptionEn: r.descriptionEn,
+              accentTone: r.accentTone,
+              updatedAt: serverTimestamp(),
+            });
+          }
+          continue;
+        }
+        {
+          await setDoc(ref, {
             id: r.id,
             nameAr: r.nameAr,
             nameEn: r.nameEn,
@@ -234,9 +253,9 @@ function MacaronApp() {
             updatedAt: serverTimestamp(),
           });
         }
+      } catch (err) {
+        console.warn(`Room ${r.id} initialization skipped:`, err);
       }
-    } catch (err) {
-      console.warn('Room initialization skipped or already seeded:', err);
     }
   }, []);
 
@@ -244,7 +263,7 @@ function MacaronApp() {
   useEffect(() => {
     if (!user || !publicProfile) return;
 
-    ensureDefaultRooms(user.uid);
+    ensureDefaultRooms(user.uid, isAdmin);
 
     const roomsQuery = query(
       collection(db, 'rooms'),
@@ -282,19 +301,22 @@ function MacaronApp() {
       (err) => handleFirestoreError(err, OperationType.LIST, 'direct_chats')
     );
 
-    const membersQuery = query(
-      collection(db, 'users_public'),
-      where('status', 'in', ['online', 'away'])
-    );
-    const unsubMembers = onSnapshot(
-      membersQuery,
-      (snap) => {
-        const list = snap.docs.map((d) => d.data() as UserPublicProfile);
-        list.sort((a, b) => a.name.localeCompare(b.name));
-        setMembers(list);
-      },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'users_public')
-    );
+    // Privacy: only admins load the full member directory (for the admin panel).
+    // Everyone else finds people by searching an exact @nickname prefix.
+    let unsubMembers = () => {};
+    if (isAdmin) {
+      unsubMembers = onSnapshot(
+        collection(db, 'users_public'),
+        (snap) => {
+          const list = snap.docs.map((d) => d.data() as UserPublicProfile);
+          list.sort((a, b) => a.name.localeCompare(b.name));
+          setMembers(list);
+        },
+        (err) => console.warn('Members listener skipped:', err.message)
+      );
+    } else {
+      setMembers([]);
+    }
 
     return () => {
       unsubRooms();
@@ -303,7 +325,7 @@ function MacaronApp() {
     };
     // Depend on hasProfile (not the profile object) so presence/profile edits
     // don't tear down and re-open every listener.
-  }, [user, hasProfile, ensureDefaultRooms]);
+  }, [user, hasProfile, isAdmin, ensureDefaultRooms]);
 
   // Presence: online while the tab is visible, away when hidden/closed
   useEffect(() => {
@@ -415,17 +437,40 @@ function MacaronApp() {
   }) => {
     if (!user) return;
 
+    const t = TRANSLATIONS[language];
     const cleanName = data.name.trim().slice(0, VALIDATION_LIMITS.MAX_NAME_LEN);
-    const cleanNickname = data.nickname.trim().slice(0, VALIDATION_LIMITS.MAX_NICKNAME_LEN);
+    const cleanNickname = normalizeNickname(data.nickname);
+    if (!NICKNAME_REGEX.test(cleanNickname)) {
+      throw new Error(t.nicknameInvalid);
+    }
     const cleanEmail = data.email.trim().slice(0, VALIDATION_LIMITS.MAX_EMAIL_LEN);
     const cleanPhoto = data.photoUrl.trim().slice(0, VALIDATION_LIMITS.MAX_PHOTO_LEN);
 
     const pubRef = doc(db, 'users_public', user.uid);
     const privRef = doc(db, 'users_private', user.uid);
 
+    // Unique nickname: check availability first for a friendly message
+    const nickRef = doc(db, 'nicknames', cleanNickname);
+    const nickSnap = await getDoc(nickRef);
+    if (nickSnap.exists() && nickSnap.data()?.uid !== user.uid) {
+      throw new Error(t.nicknameTaken);
+    }
+
     try {
       const existingPub = await getDoc(pubRef);
       const batch = writeBatch(db);
+
+      const oldNickname = existingPub.exists() ? (existingPub.data() as UserPublicProfile).nickname : '';
+      if (!nickSnap.exists()) {
+        batch.set(nickRef, { uid: user.uid, createdAt: serverTimestamp() });
+      }
+      if (oldNickname && oldNickname !== cleanNickname && NICKNAME_REGEX.test(oldNickname)) {
+        // free the previous handle (only if it is really ours — the rule checks that too)
+        const oldSnap = await getDoc(doc(db, 'nicknames', oldNickname));
+        if (oldSnap.exists() && oldSnap.data()?.uid === user.uid) {
+          batch.delete(doc(db, 'nicknames', oldNickname));
+        }
+      }
 
       if (!existingPub.exists()) {
         batch.set(pubRef, {
@@ -469,6 +514,11 @@ function MacaronApp() {
 
       await batch.commit();
     } catch (err) {
+      const code = (err as { code?: string })?.code ?? '';
+      if (code === 'permission-denied') {
+        // most likely someone claimed the same nickname a moment earlier
+        throw new Error(t.nicknameTaken);
+      }
       handleFirestoreError(err, OperationType.WRITE, `users_public/${user.uid}`);
     }
   };
@@ -499,6 +549,9 @@ function MacaronApp() {
           participant2Photo: p2.photoUrl.slice(0, VALIDATION_LIMITS.MAX_PHOTO_LEN),
           lastMessageText: '',
           createdBy: user.uid,
+          status: 'pending',
+          requestedBy: user.uid,
+          requestMessageSent: false,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
@@ -636,6 +689,7 @@ function MacaronApp() {
     user &&
       publicProfile?.name &&
       publicProfile?.nickname &&
+      NICKNAME_REGEX.test(publicProfile.nickname) &&
       publicProfile?.photoUrl &&
       privateInfo?.email
   );
@@ -654,7 +708,7 @@ function MacaronApp() {
         onCompleteProfile={handleSaveProfile}
         initialProfile={{
           name: publicProfile?.name || user?.displayName || '',
-          nickname: publicProfile?.nickname || '',
+          nickname: normalizeNickname(publicProfile?.nickname || ''),
           email: privateInfo?.email || user?.email || '',
           photoUrl: publicProfile?.photoUrl || undefined,
         }}

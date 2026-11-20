@@ -41,6 +41,11 @@ export function resolveBubbleSurface(hex: string, mode: ThemeMode): string {
     return hex;
   }
   const { r, g, b } = parseHex(hex);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  // White / near-white "other" bubbles become the dark surface colour
+  if (lum > 0.85) return '#1E2230';
+  // Saturated colours (e.g. the violet primary) already read well on dark backgrounds
+  if (lum < 0.6) return hex;
   // Mix 26% of the chosen pastel hue into deep slate (#1A1D2E -> 26, 29, 46)
   const mix = 0.28;
   const nr = 26 * (1 - mix) + r * mix;
@@ -74,7 +79,7 @@ export function resolveChatBackdropStyle(
     if (bgStyle === 'soft-butter') {
       return { backgroundColor: '#191814', backgroundImage: `radial-gradient(circle at 75% 20%, ${hexToRgba(y, 0.09)} 0%, transparent 55%)` };
     }
-    return { backgroundColor: '#141724' };
+    return { backgroundColor: '#0F1117' };
   }
 
   switch (bgStyle) {
@@ -100,6 +105,6 @@ export function resolveChatBackdropStyle(
       };
     case 'soft-cream':
     default:
-      return { backgroundColor: '#FFFDF9' };
+      return { backgroundColor: '#F7F7FA' };
   }
 }

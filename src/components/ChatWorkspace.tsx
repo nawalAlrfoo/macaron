@@ -1,5 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { doc, onSnapshot, serverTimestamp, setDoc, type Timestamp } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  getDocs,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+  type Timestamp,
+} from 'firebase/firestore';
 import {
   Edit2,
   Search,
@@ -23,8 +35,11 @@ import {
   AdminRecord,
   ChatRoom,
   DirectChat,
+  isChatAccepted,
   Language,
+  normalizeNickname,
   readKey,
+  ROOM_ICONS,
   SiteSettings,
   ThemeMode,
   UserPrivateInfo,
@@ -161,7 +176,28 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   };
 
   // ---------- Presence lookup ----------
-  const statusByUid: Record<string, 'online' | 'away'> = {};
+  // Presence for people you already chat with (no full member directory for non-admins)
+  const [peerStatus, setPeerStatus] = useState<Record<string, 'online' | 'away'>>({});
+  const peerUidsKey = directChats
+    .map((c) => (c.participant1Uid === myUid ? c.participant2Uid : c.participant1Uid))
+    .sort()
+    .join(',');
+  useEffect(() => {
+    const uids = peerUidsKey ? peerUidsKey.split(',') : [];
+    const unsubs = uids.map((uid) =>
+      onSnapshot(
+        doc(db, 'users_public', uid),
+        (snap) => {
+          const status = (snap.data() as UserPublicProfile | undefined)?.status;
+          if (status) setPeerStatus((prev) => (prev[uid] === status ? prev : { ...prev, [uid]: status }));
+        },
+        () => {}
+      )
+    );
+    return () => unsubs.forEach((u) => u());
+  }, [peerUidsKey]);
+
+  const statusByUid: Record<string, 'online' | 'away'> = { ...peerStatus };
   members.forEach((m) => {
     statusByUid[m.uid] = m.status;
   });
@@ -172,7 +208,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     return (
       <span
         title={status === 'online' ? t.onlineStatus : t.awayStatus}
-        className={`absolute -bottom-0.5 -end-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-[#1A1D2E] ${
+        className={`absolute -bottom-0.5 -end-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-[#171A23] ${
           status === 'online' ? 'bg-emerald-400' : 'bg-slate-300 dark:bg-slate-600'
         }`}
       />
@@ -180,7 +216,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   };
 
   const unreadDot = (
-    <span className="unread-pulse w-2.5 h-2.5 rounded-full bg-gradient-to-br from-pink-400 to-rose-500 shrink-0" aria-label={t.newMessagesBadge} />
+    <span className="unread-pulse w-2.5 h-2.5 rounded-full bg-[var(--primary)] shrink-0" aria-label={t.newMessagesBadge} />
   );
 
   const activeRoom = rooms.find((r) => r.id === selectedRoomId) || rooms[0];
@@ -222,20 +258,47 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     }
   };
 
-  // Privacy: people are not listed openly — they only appear when searched for
-  const memberQuery = memberFilter.trim().toLowerCase();
-  const otherMembers =
-    memberQuery.length < 2
-      ? []
-      : members
-          .filter((m) => {
-            if (m.uid === currentUserProfile.uid) return false;
-            return (
-              m.name.toLowerCase().includes(memberQuery) ||
-              m.nickname.toLowerCase().includes(memberQuery)
-            );
-          })
-          .slice(0, 8);
+  // Privacy: no open member list — people are found only by their unique @nickname
+  const memberQuery = normalizeNickname(memberFilter);
+  const [otherMembers, setOtherMembers] = useState<UserPublicProfile[]>([]);
+  const [searching, setSearching] = useState(false);
+  useEffect(() => {
+    if (memberQuery.length < 2) {
+      setOtherMembers([]);
+      return;
+    }
+    let cancelled = false;
+    setSearching(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const snap = await getDocs(
+          query(
+            collection(db, 'users_public'),
+            where('nickname', '>=', memberQuery),
+            where('nickname', '<=', memberQuery + '\uf8ff'),
+            orderBy('nickname'),
+            limit(8)
+          )
+        );
+        if (cancelled) return;
+        setOtherMembers(
+          snap.docs.map((d) => d.data() as UserPublicProfile).filter((m) => m.uid !== myUid)
+        );
+      } catch (err) {
+        console.warn('Nickname search failed:', err);
+        if (!cancelled) setOtherMembers([]);
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [memberQuery, myUid]);
+
+  const incomingRequests = directChats.filter((c) => !isChatAccepted(c) && c.requestedBy !== myUid);
+  const visibleChats = directChats.filter((c) => isChatAccepted(c) || c.requestedBy === myUid);
 
   const activeDirectPeer = activeDirectChat ? getOtherParticipant(activeDirectChat) : null;
 
@@ -254,7 +317,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   }, [unreadTotal, siteTitle]);
 
   const sidebarContent = (
-    <div className="glass-strong h-full flex flex-col border-e border-white/70 dark:border-slate-800/80 shadow-[0_0_40px_-20px_rgba(236,72,153,0.35)]">
+    <div className="glass-strong h-full flex flex-col border-e border-slate-200 dark:border-slate-800/80 shadow-sm">
       {/* Brand Row */}
       <div className="px-5 pt-5 pb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -262,7 +325,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
             <MacaronLogo size={42} />
           </span>
           <div className="min-w-0">
-            <span className="block text-base font-extrabold text-gradient truncate leading-tight">
+            <span className="block text-base font-bold text-gradient truncate leading-tight">
               {siteTitle}
             </span>
             <span className="block text-[11px] text-slate-400 dark:text-slate-500 truncate">
@@ -304,18 +367,11 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
               setActiveView('admin');
               setMobileSidebarOpen(false);
             }}
-            className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+            className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
               activeView === 'admin'
-                ? 'text-slate-900 shadow-md'
-                : 'text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-800/70'
+                ? 'bg-[var(--primary-soft)] text-[var(--primary)]'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/70'
             }`}
-            style={
-              activeView === 'admin'
-                ? {
-                    background: `linear-gradient(135deg, ${hexToRgba(settings.yellowAccent, 0.95)}, ${hexToRgba(settings.pinkAccent, 0.95)}, ${hexToRgba(settings.blueAccent, 0.95)})`,
-                  }
-                : undefined
-            }
           >
             <Shield className="w-4 h-4 shrink-0" />
             <span className="truncate">{t.adminTab}</span>
@@ -327,7 +383,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       <div className="flex-1 overflow-y-auto pastel-scroll px-4 py-3 space-y-6">
         {/* 1. Group Chat Rooms */}
         <div className="space-y-1.5">
-          <div className="px-2 pb-0.5 flex items-center justify-between text-[11px] font-extrabold tracking-wide text-slate-400 dark:text-slate-500">
+          <div className="px-2 pb-0.5 flex items-center justify-between text-[11px] font-bold tracking-wide text-slate-400 dark:text-slate-500">
             <span>{t.groupRoomsTitle}</span>
             <span className="tabular-nums px-1.5 py-px rounded-full bg-slate-100 dark:bg-slate-800 text-[10px]">{rooms.length}</span>
           </div>
@@ -343,26 +399,22 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                   setActiveView('room');
                   setMobileSidebarOpen(false);
                 }}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-2xl text-start transition-all cursor-pointer border ${
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-start transition-colors cursor-pointer ${
                   isSelected
-                    ? 'text-slate-900 dark:text-slate-50 font-bold shadow-sm border-white/80 dark:border-slate-700'
-                    : 'text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-[#202438] border-transparent'
+                    ? 'bg-[var(--primary-soft)] text-[var(--primary)] font-semibold'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1E2230]'
                 }`}
-                style={
-                  isSelected
-                    ? {
-                        background: `linear-gradient(135deg, ${hexToRgba(toneHex, themeMode === 'dark' ? 0.22 : 0.55)}, ${hexToRgba(toneHex, themeMode === 'dark' ? 0.08 : 0.18)})`,
-                      }
-                    : undefined
-                }
               >
                 <span
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border border-white/70 dark:border-white/10 transition-transform ${
-                    isSelected ? 'shadow-sm scale-105' : ''
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                    isSelected ? 'bg-white dark:bg-[#11131A]' : 'bg-slate-100 dark:bg-[#1E2230]'
                   }`}
-                  style={{ backgroundColor: hexToRgba(toneHex, themeMode === 'dark' ? 0.35 : 0.85) }}
                 >
-                  <Hash className="w-4 h-4 text-slate-800 dark:text-slate-100" />
+                  {ROOM_ICONS[room.id] ? (
+                    <span className="text-base leading-none" aria-hidden="true">{ROOM_ICONS[room.id]}</span>
+                  ) : (
+                    <Hash className="w-4 h-4 text-slate-800 dark:text-slate-100" />
+                  )}
                 </span>
                 <span
                   className={`text-xs truncate flex-1 ${
@@ -379,20 +431,60 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           })}
         </div>
 
+        {/* 2a. Incoming message requests */}
+        {incomingRequests.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="px-2 pb-0.5 flex items-center justify-between text-[11px] font-bold tracking-wide text-violet-600 dark:text-violet-300">
+              <span>{t.requestsTitle}</span>
+              <span className="tabular-nums px-1.5 py-px rounded-full bg-violet-100 dark:bg-violet-500/20 text-[10px]">{incomingRequests.length}</span>
+            </div>
+            {incomingRequests.map((chat) => {
+              const peer = getOtherParticipant(chat);
+              const isSelected = activeView === 'direct' && activeDirectChat?.id === chat.id;
+              return (
+                <button
+                  key={chat.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedDirectChatId(chat.id);
+                    setActiveView('direct');
+                    setMobileSidebarOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-start transition-colors cursor-pointer border ${
+                    isSelected
+                      ? 'bg-violet-50 dark:bg-violet-500/10 border-violet-200 dark:border-violet-500/30'
+                      : 'border-dashed border-violet-200 dark:border-violet-500/30 hover:bg-violet-50/60 dark:hover:bg-violet-500/10'
+                  }`}
+                >
+                  <AvatarImg src={peer.photoUrl} name={peer.name} sizeClass="w-8 h-8" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-bold truncate text-slate-800 dark:text-slate-100">{peer.name}</div>
+                    <div className="text-[11px] truncate text-slate-500 dark:text-slate-400">
+                      {chat.lastMessageText || `@${peer.nickname}`}
+                    </div>
+                  </div>
+                  {unreadDot}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* 2. Active Direct 1-on-1 Chats */}
         <div className="space-y-1.5">
-          <div className="px-2 pb-0.5 flex items-center justify-between text-[11px] font-extrabold tracking-wide text-slate-400 dark:text-slate-500">
+          <div className="px-2 pb-0.5 flex items-center justify-between text-[11px] font-bold tracking-wide text-slate-400 dark:text-slate-500">
             <span>{t.directChatsTitle}</span>
-            <span className="tabular-nums px-1.5 py-px rounded-full bg-slate-100 dark:bg-slate-800 text-[10px]">{directChats.length}</span>
+            <span className="tabular-nums px-1.5 py-px rounded-full bg-slate-100 dark:bg-slate-800 text-[10px]">{visibleChats.length}</span>
           </div>
 
-          {directChats.length === 0 ? (
+          {visibleChats.length === 0 ? (
             <p className="px-2.5 py-1.5 text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed">
               {t.noDirectChatsYet}
             </p>
           ) : (
-            directChats.map((chat) => {
+            visibleChats.map((chat) => {
               const peer = getOtherParticipant(chat);
+              const awaiting = !isChatAccepted(chat);
               const isSelected = activeView === 'direct' && activeDirectChat?.id === chat.id;
               const dmUnread =
                 Boolean(chat.lastMessageText) &&
@@ -408,8 +500,8 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                   }}
                   className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-2xl text-start transition-all cursor-pointer border ${
                     isSelected
-                      ? 'bg-white dark:bg-[#24283D] text-slate-900 dark:text-slate-50 font-semibold shadow-sm border-white/80 dark:border-slate-700'
-                      : 'text-slate-700 dark:text-slate-200 hover:bg-white/70 dark:hover:bg-[#202438] border-transparent'
+                      ? 'bg-white dark:bg-[#1E2230] text-slate-900 dark:text-slate-50 font-semibold shadow-sm border-slate-200 dark:border-slate-700'
+                      : 'text-slate-700 dark:text-slate-200 hover:bg-white/70 dark:hover:bg-[#1E2230] border-transparent'
                   }`}
                 >
                   <span className="relative shrink-0">
@@ -425,10 +517,10 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                           : 'text-slate-400 dark:text-slate-500'
                       }`}
                     >
-                      {chat.lastMessageText || peer.nickname}
+                      {awaiting ? t.requestPendingLabel : chat.lastMessageText || `@${peer.nickname}`}
                     </div>
                   </div>
-                  {dmUnread && unreadDot}
+                  {dmUnread && !awaiting && unreadDot}
                 </button>
               );
             })
@@ -437,7 +529,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
         {/* 3. Choose a Person to Chat Privately */}
         <div className="space-y-2">
-          <div className="px-2 pb-0.5 flex items-center justify-between text-[11px] font-extrabold tracking-wide text-slate-400 dark:text-slate-500">
+          <div className="px-2 pb-0.5 flex items-center justify-between text-[11px] font-bold tracking-wide text-slate-400 dark:text-slate-500">
             <span>{t.peopleToChatTitle}</span>
           </div>
 
@@ -449,12 +541,14 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                 value={memberFilter}
                 onChange={(e) => setMemberFilter(e.target.value)}
                 placeholder={t.searchMembersPlaceholder}
-                className="w-full ps-8 pe-3 py-2 rounded-full text-xs border border-white/80 dark:border-slate-700 bg-white/70 dark:bg-[#121523] text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-pink-200/50 dark:focus:ring-pink-500/15"
+                className="w-full ps-8 pe-3 py-2 rounded-full text-xs border border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-[#11131A] text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-violet-200/50 dark:focus:ring-violet-500/15"
               />
             </div>
           )}
 
-          {memberQuery.length < 2 ? (
+          {searching && memberQuery.length >= 2 ? (
+            <p className="px-2.5 text-[11px] text-slate-400 dark:text-slate-500">…</p>
+          ) : memberQuery.length < 2 ? (
             <p className="px-2.5 text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed">
               {t.searchPeopleHint}
             </p>
@@ -469,7 +563,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                 type="button"
                 disabled={startingDmUid === member.uid}
                 onClick={() => handleOpenMemberChat(member)}
-                className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-2xl hover:bg-white/80 dark:hover:bg-[#202438] hover:shadow-xs transition-all text-start cursor-pointer group"
+                className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-2xl hover:bg-white/80 dark:hover:bg-[#1E2230] hover:shadow-xs transition-all text-start cursor-pointer group"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <span className="relative shrink-0">
@@ -481,11 +575,11 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                       {member.name}
                     </div>
                     <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                      {member.nickname}
+                      @{member.nickname}
                     </div>
                   </div>
                 </div>
-                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-bold text-slate-400 group-hover:bg-pink-50 group-hover:text-pink-600 dark:text-slate-500 dark:group-hover:bg-pink-950/40 dark:group-hover:text-pink-300 transition-colors shrink-0">
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-bold text-slate-400 group-hover:bg-violet-50 group-hover:text-violet-600 dark:text-slate-500 dark:group-hover:bg-violet-950/40 dark:group-hover:text-violet-300 transition-colors shrink-0">
                   <Send className="w-3 h-3" />
                   <span>{t.startPrivateChat}</span>
                 </span>
@@ -496,29 +590,29 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       </div>
 
       <div className="px-5 pt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px] text-slate-400 dark:text-slate-500">
-        <a href="#/about" className="hover:text-pink-600 dark:hover:text-pink-300">{t.aboutLink}</a>
-        <a href="#/privacy" className="hover:text-pink-600 dark:hover:text-pink-300">{t.privacyLink}</a>
-        <a href="#/terms" className="hover:text-pink-600 dark:hover:text-pink-300">{t.termsLink}</a>
+        <a href="#/about" className="hover:text-violet-600 dark:hover:text-violet-300">{t.aboutLink}</a>
+        <a href="#/privacy" className="hover:text-violet-600 dark:hover:text-violet-300">{t.privacyLink}</a>
+        <a href="#/terms" className="hover:text-violet-600 dark:hover:text-violet-300">{t.termsLink}</a>
       </div>
 
       {/* Current User Footer Card */}
-      <div className="m-3 p-3 rounded-3xl space-y-2.5 bg-white/80 dark:bg-[#151827] border border-white/80 dark:border-slate-800 shadow-sm">
+      <div className="m-3 p-3 rounded-3xl space-y-2.5 bg-white/80 dark:bg-[#171A23] border border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="flex items-center gap-2.5">
           <span className="relative shrink-0">
             <AvatarImg
               src={currentUserProfile.photoUrl}
               name={currentUserProfile.name}
               sizeClass="w-10 h-10"
-              className="ring-2 ring-pink-200 dark:ring-pink-500/30"
+              className="ring-2 ring-violet-200 dark:ring-violet-500/30"
             />
-            <span className="absolute -bottom-0.5 -end-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-white dark:border-[#151827]" />
+            <span className="absolute -bottom-0.5 -end-0.5 w-3 h-3 rounded-full bg-emerald-400 border-2 border-white dark:border-[#171A23]" />
           </span>
           <div className="min-w-0 flex-1">
             <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
               {currentUserProfile.name}
             </div>
             <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-              {currentUserProfile.nickname}
+              @{currentUserProfile.nickname}
               {isAdmin ? ` · ${t.roleAdmin}` : ''}
             </div>
           </div>
@@ -536,7 +630,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           <button
             type="button"
             onClick={() => setShowSettingsModal(true)}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-bold bg-slate-100/80 dark:bg-[#1E2235] text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-[#252A41] transition-colors cursor-pointer whitespace-nowrap"
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-bold bg-slate-100/80 dark:bg-[#1E2230] text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-[#262A36] transition-colors cursor-pointer whitespace-nowrap"
           >
             <Settings className="w-3.5 h-3.5" />
             <span>{t.settingsTitle}</span>
@@ -546,7 +640,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
             type="button"
             onClick={onSignOut}
             title={t.signOut}
-            className="p-2 rounded-full bg-slate-100/80 dark:bg-[#1E2235] text-slate-600 dark:text-slate-300 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 transition-colors cursor-pointer shrink-0"
+            className="p-2 rounded-full bg-slate-100/80 dark:bg-[#1E2230] text-slate-600 dark:text-slate-300 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 transition-colors cursor-pointer shrink-0"
           >
             <LogOut className="w-3.5 h-3.5" />
           </button>
@@ -576,23 +670,23 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 h-full">
         {/* Top Workspace Bar */}
-        <header className="glass relative z-10 px-4 sm:px-6 py-3 border-b border-white/70 dark:border-slate-800/80 flex items-center justify-between gap-4 shrink-0">
+        <header className="glass relative z-10 px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between gap-4 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
               onClick={() => setMobileSidebarOpen(true)}
               aria-label="Menu"
-              className="relative lg:hidden p-2.5 rounded-full bg-white/80 dark:bg-[#1E2235] border border-white/80 dark:border-slate-700 text-slate-700 dark:text-slate-200 shadow-xs cursor-pointer"
+              className="relative lg:hidden p-2.5 rounded-full bg-white/80 dark:bg-[#1E2230] border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 shadow-xs cursor-pointer"
             >
               <Menu className="w-4 h-4" />
               {unreadTotal > 0 && (
-                <span className="absolute -top-1 -end-1 w-2.5 h-2.5 rounded-full bg-pink-500 border-2 border-white dark:border-[#1A1D2E]" />
+                <span className="absolute -top-1 -end-1 w-2.5 h-2.5 rounded-full bg-violet-500 border-2 border-white dark:border-[#171A23]" />
               )}
             </button>
 
             {activeView === 'admin' ? (
               <div className="min-w-0">
-                <h2 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-slate-50 truncate">
+                <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-50 truncate">
                   {t.adminPanelTitle}
                 </h2>
               </div>
@@ -607,11 +701,11 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                   {presenceDot(activeDirectPeer.uid)}
                 </span>
                 <div className="min-w-0">
-                  <h2 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-slate-50 truncate">
+                  <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-50 truncate">
                     {activeDirectPeer.name}
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                    {t.privateChatBadge} · {activeDirectPeer.nickname}
+                    {t.privateChatBadge} · @{activeDirectPeer.nickname}
                     {statusByUid[activeDirectPeer.uid] && (
                       <>
                         {' · '}
@@ -632,7 +726,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
             ) : activeRoom ? (
               <div className="flex items-center gap-3 min-w-0">
                 <div
-                  className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border border-white/80 dark:border-white/10 shadow-sm"
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border border-slate-200 dark:border-white/10 shadow-sm"
                   style={{
                     backgroundColor: hexToRgba(
                       getToneColor(activeRoom.accentTone),
@@ -640,10 +734,14 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                     ),
                   }}
                 >
-                  <Users className="w-4 h-4 text-slate-800 dark:text-slate-100" />
+                  {ROOM_ICONS[activeRoom.id] ? (
+                    <span className="text-lg leading-none" aria-hidden="true">{ROOM_ICONS[activeRoom.id]}</span>
+                  ) : (
+                    <Users className="w-4 h-4 text-slate-800 dark:text-slate-100" />
+                  )}
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-slate-50 truncate">
+                  <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-50 truncate">
                     {isRtl ? activeRoom.nameAr : activeRoom.nameEn}
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400 truncate hidden sm:block">
@@ -655,7 +753,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
             ) : null}
           </div>
 
-          <div className="flex items-center gap-1 p-1 rounded-full bg-white/70 dark:bg-[#121523] border border-white/80 dark:border-slate-700 shadow-xs shrink-0">
+          <div className="flex items-center gap-1 p-1 rounded-full bg-white/70 dark:bg-[#11131A] border border-slate-200 dark:border-slate-700 shadow-xs shrink-0">
             <button
               type="button"
               onClick={() => onChangeLanguage(isRtl ? 'en' : 'ar')}
@@ -711,6 +809,10 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
             themeMode={themeMode}
             settings={settings}
             onMarkRead={handleMarkRead}
+            onLeaveChat={() => {
+              setSelectedDirectChatId(null);
+              setActiveView('room');
+            }}
           />
         ) : activeRoom ? (
           <ChatRoomView

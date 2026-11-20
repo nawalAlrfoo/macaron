@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Check, Upload, X } from 'lucide-react';
 import { TRANSLATIONS } from '@/src/i18n/translations';
-import { Language, SiteSettings, VALIDATION_LIMITS } from '@/src/types/chat';
+import { Language, NICKNAME_REGEX, normalizeNickname, SiteSettings, VALIDATION_LIMITS } from '@/src/types/chat';
 import { compressAvatarFile, CURATED_AVATARS } from '@/src/utils/image';
 import { AvatarImg } from './AvatarImg';
 
@@ -60,12 +60,17 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
     setError('');
 
     const trimmedName = name.trim().slice(0, VALIDATION_LIMITS.MAX_NAME_LEN);
-    const trimmedNickname = nickname.trim().slice(0, VALIDATION_LIMITS.MAX_NICKNAME_LEN);
+    const trimmedNickname = normalizeNickname(nickname);
     const trimmedEmail = email.trim().slice(0, VALIDATION_LIMITS.MAX_EMAIL_LEN);
     const trimmedPhoto = photoUrl.trim();
 
     if (!trimmedName || !trimmedNickname || !trimmedEmail || !trimmedPhoto) {
       setError(t.profileRequiredError);
+      return;
+    }
+
+    if (!NICKNAME_REGEX.test(trimmedNickname)) {
+      setError(t.nicknameInvalid);
       return;
     }
 
@@ -92,7 +97,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/35 backdrop-blur-md">
-      <div className="w-full max-w-lg msg-in glass-strong rounded-[2rem] border border-white/80 dark:border-slate-700 p-6 sm:p-7 shadow-[0_30px_80px_-30px_rgba(236,72,153,0.5)] space-y-5">
+      <div className="w-full max-w-lg msg-in glass-strong rounded-2xl border border-slate-200 dark:border-slate-700 p-6 sm:p-7 shadow-sm space-y-5">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">
             {t.editProfile}
@@ -135,12 +140,12 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
                       type="button"
                       onClick={() => setPhotoUrl(av.url)}
                       className={`relative rounded-full p-0.5 cursor-pointer ${
-                        selected ? 'ring-2 ring-pink-400' : ''
+                        selected ? 'ring-2 ring-violet-400' : ''
                       }`}
                     >
                       <AvatarImg src={av.url} name={av.labelEn} sizeClass="w-9 h-9" />
                       {selected && (
-                        <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-pink-500 text-white flex items-center justify-center">
+                        <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-violet-500 text-white flex items-center justify-center">
                           <Check className="w-2 h-2" />
                         </span>
                       )}
@@ -162,7 +167,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
                 maxLength={VALIDATION_LIMITS.MAX_NAME_LEN}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-2xl text-sm border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-[#121523] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-pink-200/60 dark:focus:ring-pink-500/20 transition-shadow"
+                className="w-full px-3.5 py-2 rounded-2xl text-sm border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-[#11131A] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-violet-200/60 dark:focus:ring-violet-500/20 transition-shadow"
               />
             </div>
 
@@ -170,14 +175,21 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                 {t.nicknameLabel}
               </label>
-              <input
-                type="text"
-                required
-                maxLength={VALIDATION_LIMITS.MAX_NICKNAME_LEN}
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-2xl text-sm border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-[#121523] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-pink-200/60 dark:focus:ring-pink-500/20 transition-shadow"
-              />
+              <div className="relative" dir="ltr">
+                <span className="absolute inset-y-0 left-3.5 flex items-center text-sm font-semibold text-slate-400 pointer-events-none">@</span>
+                <input
+                  type="text"
+                  required
+                  dir="ltr"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  maxLength={20}
+                  value={nickname}
+                  onChange={(e) => setNickname(normalizeNickname(e.target.value))}
+                  className="w-full ps-8 pe-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#11131A] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-violet-200/60 dark:focus:ring-violet-500/20 focus:border-violet-400 transition-shadow"
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.nicknameHint}</p>
             </div>
           </div>
 
@@ -192,7 +204,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               maxLength={VALIDATION_LIMITS.MAX_EMAIL_LEN}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-2xl text-sm border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-[#121523] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-pink-200/60 dark:focus:ring-pink-500/20 transition-shadow"
+              className="w-full px-3.5 py-2 rounded-2xl text-sm border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-[#11131A] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-violet-200/60 dark:focus:ring-violet-500/20 transition-shadow"
             />
           </div>
 
@@ -213,10 +225,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2.5 rounded-full text-xs font-extrabold text-slate-900 shadow-md hover:-translate-y-px hover:shadow-lg transition-all cursor-pointer disabled:opacity-60"
-              style={{
-                background: `linear-gradient(135deg, ${settings.yellowAccent}, ${settings.pinkAccent}, ${settings.blueAccent})`,
-              }}
+              className="px-6 py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-60 border bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white border-transparent"
             >
               {saving ? t.savingProfile : isRtl ? t.saveAction : t.saveAction}
             </button>

@@ -16,20 +16,20 @@ interface PageContent {
   sections: Section[];
 }
 
-const UPDATED = '2026-11-19';
+const UPDATED = '2026-11-20';
 
 const CONTENT: Record<Language, Record<InfoPageId, PageContent>> = {
   ar: {
     about: {
       title: 'عن ماكرون',
       intro:
-        'ماكرون مساحة دردشة لطيفة بألوان الباستيل، فيها غرف جماعية ومحادثات خاصة، بالعربي والإنجليزي، بالنهار وبالليل.',
+        'ماكرون مجتمع للتعلم والأسئلة: غرف للأسئلة العامة والبرمجة والدراسة والمشاريع والتدريب، ومحادثات خاصة بطلب، بالعربي والإنجليزي.',
       sections: [
         {
           title: 'شو بتقدر تعمل؟',
           body: [
-            'تنضم لغرف جماعية وتحكي مع الناس بمواضيع مختلفة.',
-            'تبدأ محادثة خاصة مع أي شخص بتبحث عنه بالاسم أو اللقب.',
+            'تسأل وتجاوب بغرف التعلم: الأسئلة العامة، البرمجة، الدراسة، المشاريع، والتدريب والوظائف.',
+            'تبحث عن أي شخص باسم المستخدم (@) وتبعتله طلب محادثة برسالة وحدة، وبعد ما يقبل بتكمّلوا الحديث.',
             'ترسل صور، ترد على رسائل، تعدّل أو تحذف رسائلك، وتتفاعل بالإيموجي.',
             'تشوف مين عم يكتب هلأ، ووين في رسائل جديدة ما قرأتها.',
           ],
@@ -51,7 +51,7 @@ const CONTENT: Record<Language, Record<InfoPageId, PageContent>> = {
           title: 'شو المعلومات اللي بنحفظها؟',
           body: [
             'حساب Google: بنستخدم تسجيل الدخول من Google بس للتعرّف عليك، وما بنوصل لكلمة سرك.',
-            'ملفك: الاسم، اللقب، الصورة، وبريدك الإلكتروني.',
+            'ملفك: الاسم، اسم المستخدم (@)، الصورة، وبريدك الإلكتروني.',
             'رسائلك والصور اللي بترسلها، والتفاعلات على الرسائل.',
             'معلومات استخدام بسيطة: إذا كنت متصل أو لا، إذا عم تكتب هلأ، وآخر وقت فتحت فيه كل محادثة (حتى نعرض الرسائل غير المقروءة).',
           ],
@@ -59,8 +59,8 @@ const CONTENT: Record<Language, Record<InfoPageId, PageContent>> = {
         {
           title: 'مين بيشوف معلوماتك؟',
           body: [
-            'اسمك ولقبك وصورتك وحالة الاتصال بتظهر للأعضاء المسجلين.',
-            'ما في قائمة مفتوحة بكل الأعضاء؛ الناس بيلاقوك بس إذا بحثوا عن اسمك أو لقبك.',
+            'اسمك واسم المستخدم وصورتك بتظهر للأعضاء اللي بتحكي معهم أو اللي بيبحثوا عنك.',
+            'ما في قائمة مفتوحة بالأعضاء؛ الناس بيلاقوك بس إذا بحثوا عن اسم المستخدم تبعك، وما حدا بيقدر يكمّل محادثة معك إلا إذا قبلت طلبه.',
             'بريدك الإلكتروني خاص، ما بيشوفه إلا إنت وإدارة الموقع.',
             'رسائل الغرف الجماعية بيشوفها كل الأعضاء، والمحادثات الخاصة بيشوفها طرفيها بس.',
           ],
@@ -75,7 +75,7 @@ const CONTENT: Record<Language, Record<InfoPageId, PageContent>> = {
         {
           title: 'حقوقك',
           body: [
-            'بتقدر تعدّل اسمك ولقبك وصورتك وبريدك بأي وقت من «تعديل الملف».',
+            'بتقدر تعدّل اسمك واسم المستخدم وصورتك وبريدك بأي وقت من «تعديل الملف».',
             'بتقدر تحذف أي رسالة إنت بعتها.',
             'إذا بدك تحذف حسابك وكل بياناتك، تواصل معنا عبر nawal.pro وبنحذفها.',
           ],
@@ -115,13 +115,13 @@ const CONTENT: Record<Language, Record<InfoPageId, PageContent>> = {
     about: {
       title: 'About Macaron',
       intro:
-        'Macaron is a cozy pastel chat space with group rooms and private chats, in Arabic and English, by day or by night.',
+        'Macaron is a community for learning and questions: rooms for general Q&A, programming, study, projects and careers, plus request-based private chats, in Arabic and English.',
       sections: [
         {
           title: 'What can you do?',
           body: [
-            'Join group rooms and talk with people about different topics.',
-            'Start a private chat with anyone you find by name or nickname.',
+            'Ask and answer in learning rooms: general Q&A, programming, study, projects, and internships & careers.',
+            'Find anyone by @username and send a one-message chat request; once accepted, keep talking.',
             'Send photos, reply to messages, edit or delete your own messages, and react with emoji.',
             'See who is typing right now and where you have unread messages.',
           ],
@@ -143,7 +143,7 @@ const CONTENT: Record<Language, Record<InfoPageId, PageContent>> = {
           title: 'What we store',
           body: [
             'Google account: Google sign-in is only used to identify you; we never see your password.',
-            'Your profile: name, nickname, photo, and email address.',
+            'Your profile: name, @username, photo, and email address.',
             'Your messages, the photos you send, and reactions.',
             'Basic activity: whether you are online, whether you are typing, and when you last opened each conversation (for unread indicators).',
           ],
@@ -151,8 +151,8 @@ const CONTENT: Record<Language, Record<InfoPageId, PageContent>> = {
         {
           title: 'Who can see it',
           body: [
-            'Your name, nickname, photo and online status are visible to signed-in members.',
-            'There is no open member list; people only find you by searching your name or nickname.',
+            'Your name, username and photo are visible to people you chat with or who search for you.',
+            'There is no open member list; people only find you by your exact username, and nobody can keep chatting with you unless you accept their request.',
             'Your email is private: only you and the site admins can see it.',
             'Group room messages are visible to all members; private chats are visible only to the two participants.',
           ],
@@ -167,7 +167,7 @@ const CONTENT: Record<Language, Record<InfoPageId, PageContent>> = {
         {
           title: 'Your rights',
           body: [
-            'You can change your name, nickname, photo and email anytime from "Edit profile".',
+            'You can change your name, username, photo and email anytime from "Edit profile".',
             'You can delete any message you sent.',
             'To delete your account and all your data, contact us via nawal.pro.',
           ],
@@ -223,7 +223,7 @@ export const InfoPage: React.FC<InfoPageProps> = ({ page, language, backLabel, o
 
   return (
     <div className="min-h-dvh w-full px-4 py-6 sm:py-10">
-      <article className="msg-in glass-strong max-w-2xl mx-auto rounded-[2rem] border border-white/80 dark:border-slate-700/70 shadow-[0_24px_60px_-30px_rgba(236,72,153,0.45)] p-6 sm:p-10 space-y-6 text-slate-700 dark:text-slate-200">
+      <article className="msg-in glass-strong max-w-2xl mx-auto rounded-2xl border border-slate-200 dark:border-slate-700/70 shadow-sm p-6 sm:p-10 space-y-6 text-slate-700 dark:text-slate-200">
         <div className="flex items-center justify-between gap-3">
           <button
             type="button"
@@ -239,14 +239,14 @@ export const InfoPage: React.FC<InfoPageProps> = ({ page, language, backLabel, o
         </div>
 
         <header className="space-y-2">
-          <h1 className="text-3xl font-extrabold text-gradient">{c.title}</h1>
+          <h1 className="text-3xl font-bold text-gradient">{c.title}</h1>
           <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">{c.intro}</p>
         </header>
 
         {c.sections.map((sec) => (
           <section key={sec.title} className="space-y-2">
-            <h2 className="text-base font-extrabold text-slate-900 dark:text-slate-50">{sec.title}</h2>
-            <ul className="space-y-1.5 text-sm leading-relaxed list-disc ps-5 marker:text-pink-400">
+            <h2 className="text-base font-bold text-slate-900 dark:text-slate-50">{sec.title}</h2>
+            <ul className="space-y-1.5 text-sm leading-relaxed list-disc ps-5 marker:text-violet-400">
               {sec.body.map((line) => (
                 <li key={line}>{line}</li>
               ))}
@@ -259,9 +259,9 @@ export const InfoPage: React.FC<InfoPageProps> = ({ page, language, backLabel, o
             {isRtl ? 'آخر تحديث' : 'Last updated'}: <span dir="ltr">{UPDATED}</span>
           </span>
           <nav className="flex items-center gap-3">
-            <a href="#/about" className="hover:text-pink-600">{CONTENT[language].about.title}</a>
-            <a href="#/privacy" className="hover:text-pink-600">{CONTENT[language].privacy.title}</a>
-            <a href="#/terms" className="hover:text-pink-600">{CONTENT[language].terms.title}</a>
+            <a href="#/about" className="hover:text-violet-600">{CONTENT[language].about.title}</a>
+            <a href="#/privacy" className="hover:text-violet-600">{CONTENT[language].privacy.title}</a>
+            <a href="#/terms" className="hover:text-violet-600">{CONTENT[language].terms.title}</a>
           </nav>
         </footer>
       </article>

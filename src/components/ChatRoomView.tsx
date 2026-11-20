@@ -32,6 +32,7 @@ import {
   ChatMessage,
   ChatRoom,
   DirectChat,
+  isChatAccepted,
   Language,
   REACTION_EMOJIS,
   readKey,
@@ -62,6 +63,8 @@ interface ChatRoomViewProps {
   settings: SiteSettings;
   /** Called whenever the user has seen the latest messages of this conversation */
   onMarkRead?: (key: string) => void;
+  /** Called after the current user declines/cancels a pending request (chat is deleted) */
+  onLeaveChat?: () => void;
 }
 
 const QUICK_EMOJIS = ['✨', '💛', '🩷', '🩵', '🌸', '☁️', '☕', '😊', '🫶', '🌟'];
@@ -111,6 +114,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
   themeMode,
   settings,
   onMarkRead,
+  onLeaveChat,
 }) => {
   const t = TRANSLATIONS[language];
   const isRtl = language === 'ar';
@@ -119,6 +123,46 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
 
   const targetId = mode === 'room' ? room?.id : directChat?.id;
   const baseCollection = mode === 'room' ? 'rooms' : 'direct_chats';
+
+  // ---------- Message requests (private chats) ----------
+  const isPending = mode === 'direct' && !!directChat && !isChatAccepted(directChat);
+  const iRequested = isPending && directChat?.requestedBy === currentUserProfile.uid;
+  const requestUsed = isPending && !!directChat?.requestMessageSent;
+  const canCompose = !isPending || (iRequested && !requestUsed);
+  const [requestBusy, setRequestBusy] = useState(false);
+
+  const handleAcceptRequest = async () => {
+    if (!directChat) return;
+    setRequestBusy(true);
+    try {
+      await updateDoc(doc(db, 'direct_chats', directChat.id), {
+        status: 'accepted',
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `direct_chats/${directChat.id}`);
+    } finally {
+      setRequestBusy(false);
+    }
+  };
+
+  const handleDeclineRequest = async () => {
+    if (!directChat) return;
+    setRequestBusy(true);
+    try {
+      // remove the request message(s) first so a future request starts clean
+      const msgs = messages.map((m) => m.id);
+      const batch = writeBatch(db);
+      msgs.forEach((id) => batch.delete(doc(db, 'direct_chats', directChat.id, 'messages', id)));
+      batch.delete(doc(db, 'direct_chats', directChat.id));
+      await batch.commit();
+      onLeaveChat?.();
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `direct_chats/${directChat.id}`);
+    } finally {
+      setRequestBusy(false);
+    }
+  };
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -445,6 +489,8 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         batch.update(doc(db, 'direct_chats', targetId), {
           lastMessageText: (clean || t.photoSentPreview).slice(0, 200),
           updatedAt: serverTimestamp(),
+          // the single message allowed while the chat is still a request
+          ...(isPending && iRequested ? { requestMessageSent: true } : {}),
         });
         await batch.commit();
       } else {
@@ -581,25 +627,28 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
   const otherBg = resolveBubbleSurface(settings.otherBubbleColor, themeMode);
   const myText = getReadableTextColor(myBg);
   const otherText = getReadableTextColor(otherBg);
-  const gradient = `linear-gradient(135deg, ${hexToRgba(settings.yellowAccent, 0.95)}, ${hexToRgba(settings.pinkAccent, 0.95)}, ${hexToRgba(settings.blueAccent, 0.95)})`;
+  const gradient = settings.primaryColor;
 
   const getBubbleRadius = (isMine: boolean, grouped = false) => {
-    if (settings.bubbleStyle === 'pill') return 'rounded-[1.6rem]';
-    if (settings.bubbleStyle === 'classic') return 'rounded-xl';
+    if (settings.bubbleStyle === 'pill') return 'rounded-2xl';
+    if (settings.bubbleStyle === 'classic') {
+      if (grouped) return 'rounded-2xl';
+      return isMine ? 'rounded-2xl rounded-ee-md' : 'rounded-2xl rounded-es-md';
+    }
     // "cute": soft tail on the first bubble of a group, rounder for the rest
-    const tail = grouped ? 'rounded-[1.4rem]' : '';
+    const tail = grouped ? 'rounded-2xl' : '';
     if (isRtl) {
       return isMine
-        ? `rounded-[1.4rem] rounded-bl-md ${tail}`
-        : `rounded-[1.4rem] rounded-br-md ${tail}`;
+        ? `rounded-2xl rounded-bl-md ${tail}`
+        : `rounded-2xl rounded-br-md ${tail}`;
     }
     return isMine
-      ? `rounded-[1.4rem] rounded-br-md ${tail}`
-      : `rounded-[1.4rem] rounded-bl-md ${tail}`;
+      ? `rounded-2xl rounded-br-md ${tail}`
+      : `rounded-2xl rounded-bl-md ${tail}`;
   };
 
   const actionBtn =
-    'p-1.5 rounded-full glass-strong border border-white/80 dark:border-slate-700 text-slate-500 hover:text-pink-600 dark:hover:text-pink-300 shadow-xs hover:shadow-sm cursor-pointer transition-all';
+    'p-1.5 rounded-full glass-strong border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-violet-600 dark:hover:text-violet-300 shadow-xs hover:shadow-sm cursor-pointer transition-all';
 
   const renderReactions = (msg: ChatMessage, isMine: boolean) => {
     const entries = Object.entries(msg.reactions ?? {});
@@ -620,8 +669,8 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
               onClick={() => handleToggleReaction(msg, em)}
               className={`pop-in inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border shadow-xs cursor-pointer transition-all hover:-translate-y-0.5 ${
                 mine
-                  ? 'bg-pink-50 dark:bg-pink-950/50 border-pink-300 dark:border-pink-700 text-pink-700 dark:text-pink-200'
-                  : 'bg-white/85 dark:bg-[#1E2235] border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                  ? 'bg-violet-50 dark:bg-violet-950/50 border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-200'
+                  : 'bg-white/85 dark:bg-[#1E2230] border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
               }`}
             >
               <span>{em}</span>
@@ -650,7 +699,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
           role="separator"
         >
           <span className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-300/70 to-transparent dark:via-slate-700" />
-          <span className="glass px-3.5 py-1 rounded-full text-[11px] font-bold text-slate-500 dark:text-slate-400 border border-white/70 dark:border-slate-700/70 shadow-xs">
+          <span className="glass px-3.5 py-1 rounded-full text-[11px] font-bold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700/70 shadow-xs">
             {formatDayLabel(date)}
           </span>
           <span className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-300/70 to-transparent dark:via-slate-700" />
@@ -695,7 +744,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
             src={msg.senderPhoto}
             name={msg.senderName}
             sizeClass="w-9 h-9"
-            className="shadow-sm ring-2 ring-white dark:ring-[#1A1D2E]"
+            className="shadow-sm ring-2 ring-white dark:ring-[#171A23]"
           />
         )}
 
@@ -710,7 +759,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
               {isMine ? t.youLabel : msg.senderName}
             </span>
             <span aria-hidden="true">·</span>
-            <span>{msg.senderNickname}</span>
+            <span dir="ltr">@{msg.senderNickname}</span>
             <span aria-hidden="true">·</span>
             <span className="tabular-nums">{formatTime(msg)}</span>
             {isEdited && (
@@ -724,22 +773,12 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
           {/* Bubble */}
           <div
             onClick={() => setActionsOpenFor((cur) => (cur === msg.id ? null : msg.id))}
-            className={`relative px-4 py-2.5 text-[0.9rem] leading-relaxed border space-y-2 transition-shadow ${
-              isMine ? 'border-white/60 dark:border-white/10' : 'border-white/80 dark:border-white/5'
+            className={`relative px-4 py-2.5 text-[0.9rem] leading-relaxed space-y-2 shadow-[0_1px_2px_rgba(15,23,42,0.06)] ${
+              isMine ? 'border border-transparent' : 'border border-slate-200 dark:border-[#262A36]'
             } ${getBubbleRadius(isMine, isGrouped)}`}
             style={{
               backgroundColor: isMine ? myBg : otherBg,
-              backgroundImage: isMine
-                ? `linear-gradient(160deg, ${hexToRgba('#ffffff', themeMode === 'dark' ? 0.04 : 0.45)} 0%, transparent 60%)`
-                : `linear-gradient(160deg, ${hexToRgba('#ffffff', themeMode === 'dark' ? 0.03 : 0.5)} 0%, transparent 60%)`,
               color: isMine ? myText : otherText,
-              boxShadow:
-                themeMode === 'dark'
-                  ? '0 1px 2px rgba(0,0,0,0.25)'
-                  : `0 1px 2px rgba(15,23,42,0.04), 0 6px 16px -8px ${hexToRgba(
-                      isMine ? settings.pinkAccent : settings.blueAccent,
-                      0.9
-                    )}`,
             }}
           >
             {msg.replyToText && (
@@ -763,7 +802,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
                   e.stopPropagation();
                   setLightboxImage(msg.imageUrl || null);
                 }}
-                className="block rounded-xl overflow-hidden border border-black/10 dark:border-white/10 cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-pink-400"
+                className="block rounded-xl overflow-hidden border border-black/10 dark:border-white/10 cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-violet-400"
               >
                 <img
                   src={msg.imageUrl}
@@ -833,7 +872,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
           }`}
         >
           {confirmDeleteId === msg.id ? (
-            <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-white dark:bg-[#1E2235] border border-rose-200 dark:border-rose-800 shadow-sm">
+            <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-white dark:bg-[#1E2230] border border-rose-200 dark:border-rose-800 shadow-sm">
               <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-300 whitespace-nowrap">
                 {t.confirmDeleteQuestion}
               </span>
@@ -918,7 +957,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
 
           {reactPickerFor === msg.id && (
             <div
-              className={`pop-in absolute bottom-full mb-1.5 z-20 flex items-center gap-0.5 p-1 rounded-full glass-strong border border-white/80 dark:border-slate-700 shadow-lg ${
+              className={`pop-in absolute bottom-full mb-1.5 z-20 flex items-center gap-0.5 p-1 rounded-full glass-strong border border-slate-200 dark:border-slate-700 shadow-lg ${
                 isMine ? 'end-0' : 'start-0'
               }`}
             >
@@ -928,7 +967,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
                   type="button"
                   onClick={() => handleToggleReaction(msg, em)}
                   className={`w-9 h-9 rounded-full text-lg flex items-center justify-center cursor-pointer hover:bg-amber-50 dark:hover:bg-slate-800 transition-transform hover:scale-125 ${
-                    msg.reactions?.[myUid] === em ? 'bg-pink-100 dark:bg-pink-900/50' : ''
+                    msg.reactions?.[myUid] === em ? 'bg-violet-100 dark:bg-violet-900/50' : ''
                   }`}
                 >
                   {em}
@@ -946,7 +985,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
       {/* Search in conversation */}
       <div className="absolute top-3 end-4 z-20 flex items-center gap-2">
         {searchOpen && (
-          <div className="msg-in glass-strong flex items-center gap-2 ps-3.5 pe-2 py-2 rounded-full border border-white/80 dark:border-slate-700 shadow-md">
+          <div className="msg-in glass-strong flex items-center gap-2 ps-3.5 pe-2 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-md">
             <input
               type="text"
               autoFocus
@@ -975,7 +1014,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
             if (searchOpen) setSearchQuery('');
           }}
           title={searchOpen ? t.closeBtn : t.searchMessagesPlaceholder}
-          className="glass p-2.5 rounded-full border border-white/80 dark:border-slate-700 text-slate-500 hover:text-pink-600 dark:text-slate-400 dark:hover:text-pink-300 shadow-sm cursor-pointer transition-colors"
+          className="glass p-2.5 rounded-full border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300 shadow-sm cursor-pointer transition-colors"
         >
           {searchOpen ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
         </button>
@@ -993,13 +1032,13 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
           </div>
         ) : messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
-            <div className="msg-in glass relative overflow-hidden max-w-sm text-center space-y-3 px-8 py-9 rounded-[2rem] border border-white/70 dark:border-slate-700/70 shadow-[0_20px_50px_-24px_rgba(236,72,153,0.45)]">
+            <div className="msg-in glass relative overflow-hidden max-w-sm text-center space-y-3 px-8 py-9 rounded-2xl border border-slate-200 dark:border-slate-700/70 shadow-sm">
               <span className="pastel-blob w-32 h-32 -top-10 -start-10" style={{ backgroundColor: settings.yellowAccent }} />
               <span className="pastel-blob w-32 h-32 -bottom-12 -end-10 [animation-delay:-5s]" style={{ backgroundColor: settings.blueAccent }} />
               <span className="logo-shine relative inline-flex mx-auto rounded-[1.1rem] shadow-md rotate-6">
                 <MacaronLogo size={64} />
               </span>
-              <h3 className="relative text-lg font-extrabold text-slate-800 dark:text-slate-100">{t.emptyRoomTitle}</h3>
+              <h3 className="relative text-lg font-bold text-slate-800 dark:text-slate-100">{t.emptyRoomTitle}</h3>
               <p className="relative text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{t.emptyRoomDesc}</p>
             </div>
           </div>
@@ -1018,7 +1057,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         <button
           type="button"
           onClick={() => scrollToBottom(true)}
-          className="pop-in absolute bottom-28 start-1/2 -translate-x-1/2 rtl:translate-x-1/2 z-20 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-[11px] font-extrabold text-slate-900 shadow-lg border border-white/70 cursor-pointer hover:-translate-y-0.5 transition-transform"
+          className="pop-in absolute bottom-28 start-1/2 -translate-x-1/2 rtl:translate-x-1/2 z-20 inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-[11px] font-semibold text-white shadow-md cursor-pointer hover:-translate-y-0.5 transition-transform"
           style={{ background: gradient }}
         >
           <ArrowDown className="w-3.5 h-3.5" />
@@ -1027,7 +1066,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
       )}
 
       {/* Composer */}
-      <div className="px-3 sm:px-6 lg:px-10 pb-4 pt-1 bg-gradient-to-t from-white/80 via-white/50 to-transparent dark:from-[#11131E]/90 dark:via-[#11131E]/60">
+      <div className="px-3 sm:px-6 lg:px-10 pb-4 pt-1 bg-gradient-to-t from-[var(--app-bg)] via-[var(--app-bg)]/80 to-transparent">
         <div className="h-5 px-2 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5" aria-live="polite">
           {typingLabel && (
             <>
@@ -1048,7 +1087,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         )}
 
         {attachedPhoto && (
-          <div className="msg-in glass-strong mb-2 p-2.5 rounded-2xl border border-white/80 dark:border-slate-700 flex items-center justify-between gap-3 w-fit shadow-sm">
+          <div className="msg-in glass-strong mb-2 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3 w-fit shadow-sm">
             <div className="flex items-center gap-3">
               <img
                 src={attachedPhoto}
@@ -1070,7 +1109,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         )}
 
         {replyTo && (
-          <div className="msg-in glass-strong mb-2 px-4 py-2 rounded-2xl border border-white/80 dark:border-slate-700 border-s-4 !border-s-pink-300 dark:!border-s-pink-500/60 flex items-center justify-between gap-3 text-xs shadow-sm">
+          <div className="msg-in glass-strong mb-2 px-4 py-2 rounded-2xl border border-slate-200 dark:border-slate-700 border-s-4 !border-s-violet-300 dark:!border-s-violet-500/60 flex items-center justify-between gap-3 text-xs shadow-sm">
             <div className="min-w-0 truncate">
               <span className="font-semibold text-slate-700 dark:text-slate-200">
                 {t.replyingTo} {replyTo.senderName}:{' '}
@@ -1089,7 +1128,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         )}
 
         {showEmojiTray && (
-          <div className="msg-in glass-strong mb-2 p-2 rounded-2xl border border-white/80 dark:border-slate-700 flex flex-wrap items-center gap-1 w-fit shadow-md">
+          <div className="msg-in glass-strong mb-2 p-2 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-wrap items-center gap-1 w-fit shadow-md">
             {QUICK_EMOJIS.map((em) => (
               <button
                 key={em}
@@ -1106,9 +1145,52 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
           </div>
         )}
 
+        {isPending && !canCompose ? (
+          iRequested ? (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#171A23] text-xs text-slate-600 dark:text-slate-300">
+              <span aria-hidden="true">⏳</span>
+              <span className="flex-1">{t.requestSentWaiting}</span>
+              <button
+                type="button"
+                disabled={requestBusy}
+                onClick={handleDeclineRequest}
+                className="px-3 py-1.5 rounded-full text-[11px] font-bold text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {t.cancelRequest}
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3 rounded-2xl border border-violet-200 dark:border-violet-500/30 bg-violet-50 dark:bg-violet-500/10 text-xs text-slate-700 dark:text-slate-200">
+              <span className="flex-1 leading-relaxed">{t.requestReceivedText}</span>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  disabled={requestBusy}
+                  onClick={handleDeclineRequest}
+                  className="px-4 py-2 rounded-full text-xs font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-rose-600 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {t.declineRequest}
+                </button>
+                <button
+                  type="button"
+                  disabled={requestBusy}
+                  onClick={handleAcceptRequest}
+                  className="px-4 py-2 rounded-full text-xs font-bold text-white transition-colors cursor-pointer disabled:opacity-50"
+                  style={{ backgroundColor: settings.primaryColor }}
+                >
+                  {t.acceptRequest}
+                </button>
+              </div>
+            </div>
+          )
+        ) : (
+        <>
+        {isPending && iRequested && !requestUsed && (
+          <p className="mb-2 px-2 text-[11px] text-slate-500 dark:text-slate-400">{t.requestOneMessageHint}</p>
+        )}
         <form
           onSubmit={handleSend}
-          className="glass-strong flex items-end gap-1.5 p-1.5 ps-2 rounded-[1.75rem] border border-white/80 dark:border-slate-700/80 shadow-[0_12px_40px_-16px_rgba(236,72,153,0.45)] dark:shadow-[0_12px_40px_-16px_rgba(0,0,0,0.6)] focus-within:ring-4 focus-within:ring-pink-200/50 dark:focus-within:ring-pink-500/15 transition-shadow"
+          className="glass-strong flex items-end gap-1.5 p-1.5 ps-2 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-sm dark:shadow-sm focus-within:ring-4 focus-within:ring-violet-200/50 dark:focus-within:ring-violet-500/15 transition-shadow"
         >
           <input ref={photoInputRef} type="file" accept="image/*" onChange={handleFileInputChange} className="hidden" />
 
@@ -1116,7 +1198,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
             type="button"
             onClick={() => photoInputRef.current?.click()}
             title={t.attachPhoto}
-            className="p-2.5 rounded-full text-slate-500 hover:text-pink-600 dark:text-slate-400 dark:hover:text-pink-300 hover:bg-pink-50 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+            className="p-2.5 rounded-full text-slate-500 hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300 hover:bg-violet-50 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
           >
             <ImagePlus className="w-4 h-4" />
           </button>
@@ -1152,13 +1234,15 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
           <button
             type="submit"
             disabled={(!text.trim() && !attachedPhoto) || sending}
-            className="inline-flex items-center justify-center gap-2 h-10 min-w-10 px-3 sm:px-4 rounded-full text-xs font-extrabold text-slate-900 transition-all hover:shadow-md hover:-translate-y-px active:scale-95 disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-none cursor-pointer shrink-0 border border-white/70"
+            className="inline-flex items-center justify-center gap-2 h-10 min-w-10 px-3 sm:px-4 rounded-xl text-xs font-semibold text-white transition-all hover:brightness-110 active:scale-95 disabled:opacity-40 cursor-pointer shrink-0"
             style={{ background: gradient }}
           >
             <span className="hidden sm:inline">{t.sendMessage}</span>
             <Send className="w-4 h-4 rtl:-scale-x-100" />
           </button>
         </form>
+        </>
+        )}
       </div>
 
       {/* Full-Size Photo Lightbox Modal */}

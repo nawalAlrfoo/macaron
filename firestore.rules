@@ -89,6 +89,17 @@ service cloud.firestore {
         && data.lastRead.size() <= 500;
     }
 
+    // Unique @nickname handle (keep in sync with NICKNAME_REGEX in src/types/chat.ts)
+    function isValidHandle(h) {
+      return h is string && h.matches('[a-z0-9_.]{3,20}');
+    }
+
+    // The nickname doc must be owned by this user once the write/batch is applied
+    function ownsHandle(h) {
+      return isValidHandle(h)
+        && getAfter(/databases/$(database)/documents/nicknames/$(h)).data.uid == request.auth.uid;
+    }
+
     // --- Validation Blueprints ---
     function isValidUserPublicProfile(data, expectedUid) {
       return data.keys().hasAll(['uid', 'name', 'nickname', 'photoUrl', 'status', 'createdAt', 'updatedAt'])
@@ -210,8 +221,12 @@ service cloud.firestore {
           'id', 'participantUids',
           'participant1Uid', 'participant1Name', 'participant1Nickname', 'participant1Photo',
           'participant2Uid', 'participant2Name', 'participant2Nickname', 'participant2Photo',
-          'lastMessageText', 'createdBy', 'createdAt', 'updatedAt'
+          'lastMessageText', 'createdBy', 'createdAt', 'updatedAt',
+          'status', 'requestedBy', 'requestMessageSent'
         ])
+        && (!('status' in data) || data.status in ['pending', 'accepted'])
+        && (!('requestedBy' in data) || (isValidId(data.requestedBy) && data.requestedBy in data.participantUids))
+        && (!('requestMessageSent' in data) || data.requestMessageSent is bool)
         && isValidId(data.id)
         && data.id == expectedChatId
         && isValidParticipantPair(data.participantUids)
@@ -265,11 +280,13 @@ service cloud.firestore {
     // 1. Public User Profiles (No PII)
     match /users_public/{userId} {
       allow get: if isValidId(userId) && isVerified();
-      allow list: if isVerified() && resource.data.status in ['online', 'away'];
+      // No open directory: members can only run small searches (by @nickname); admins can list everyone
+      allow list: if isVerified() && (isAdmin() || request.query.limit <= 10);
 
       allow create: if isValidId(userId)
         && isOwner(userId)
         && isValidUserPublicProfile(incoming(), userId)
+        && ownsHandle(incoming().nickname)
         && incoming().createdAt == request.time
         && incoming().updatedAt == request.time;
 
@@ -279,11 +296,31 @@ service cloud.firestore {
         && incoming().createdAt == existing().createdAt
         && incoming().updatedAt == request.time
         && (
+          !('nickname' in incoming().diff(existing()).affectedKeys())
+          || isAdmin()
+          || ownsHandle(incoming().nickname)
+        )
+        && (
           isAdmin() ||
           (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'nickname', 'photoUrl', 'status', 'updatedAt']))
         );
 
       allow delete: if isValidId(userId) && (isOwner(userId) || isAdmin());
+    }
+
+    // 1b. Unique nickname registry: /nicknames/{handle} -> { uid }
+    // create only succeeds when the handle is free (an existing doc would make it an update, which is denied)
+    match /nicknames/{handle} {
+      allow get: if isVerified();
+      allow list: if false;
+      allow create: if isVerified()
+        && isValidHandle(handle)
+        && incoming().keys().hasAll(['uid', 'createdAt'])
+        && incoming().keys().hasOnly(['uid', 'createdAt'])
+        && incoming().uid == request.auth.uid
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isVerified() && (existing().uid == request.auth.uid || isAdmin());
     }
 
     // 2. Private User PII (Email) - Owner or Admin Only
@@ -365,7 +402,7 @@ service cloud.firestore {
         && incoming().updatedAt == request.time
         && (
           isAdmin() ||
-          (roomId in ['general', 'stories', 'pastel-art'] && !exists(/databases/$(database)/documents/rooms/$(roomId)))
+          (roomId in ['general', 'stories', 'pastel-art', 'projects', 'career'] && !exists(/databases/$(database)/documents/rooms/$(roomId)))
         );
 
       allow update: if isValidRoomId(roomId)
@@ -458,6 +495,9 @@ service cloud.firestore {
         && isValidDirectChat(incoming(), chatId)
         && request.auth.uid in incoming().participantUids
         && incoming().createdBy == request.auth.uid
+        && incoming().status == 'pending'
+        && incoming().requestedBy == request.auth.uid
+        && incoming().requestMessageSent == false
         && incoming().createdAt == request.time
         && incoming().updatedAt == request.time;
 
@@ -472,13 +512,37 @@ service cloud.firestore {
         && incoming().createdBy == existing().createdBy
         && incoming().createdAt == existing().createdAt
         && incoming().updatedAt == request.time
-        && incoming().diff(existing()).affectedKeys().hasOnly([
-          'lastMessageText', 'updatedAt',
-          'participant1Name', 'participant1Nickname', 'participant1Photo',
-          'participant2Name', 'participant2Nickname', 'participant2Photo'
-        ]);
+        && (
+          (
+            // normal activity (new message preview, participant info refresh)
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'lastMessageText', 'updatedAt', 'requestMessageSent',
+              'participant1Name', 'participant1Nickname', 'participant1Photo',
+              'participant2Name', 'participant2Nickname', 'participant2Photo'
+            ])
+            && (
+              !('requestMessageSent' in incoming().diff(existing()).affectedKeys())
+              || (existing().requestedBy == request.auth.uid && incoming().requestMessageSent == true)
+            )
+          ) || (
+            // the person who received the request accepts it
+            existing().get('status', 'accepted') == 'pending'
+            && existing().requestedBy != request.auth.uid
+            && incoming().status == 'accepted'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          )
+        );
 
-      allow delete: if isValidId(chatId) && isAdmin();
+      // admins, or either participant while it is still a request (decline / cancel)
+      allow delete: if isValidId(chatId)
+        && (
+          isAdmin()
+          || (
+            isVerified()
+            && request.auth.uid in existing().participantUids
+            && existing().get('status', 'accepted') == 'pending'
+          )
+        );
 
       // 8. Private Direct Messages Subcollection (Master Gate checks parent direct_chat & participants)
       match /messages/{messageId} {
@@ -497,7 +561,16 @@ service cloud.firestore {
           && incoming().updatedAt == request.time
           && exists(/databases/$(database)/documents/direct_chats/$(chatId))
           && request.auth.uid in get(/databases/$(database)/documents/direct_chats/$(chatId)).data.participantUids
-          && incoming().participantUids == get(/databases/$(database)/documents/direct_chats/$(chatId)).data.participantUids;
+          && incoming().participantUids == get(/databases/$(database)/documents/direct_chats/$(chatId)).data.participantUids
+          && (
+            get(/databases/$(database)/documents/direct_chats/$(chatId)).data.get('status', 'accepted') == 'accepted'
+            || (
+              // pending request: the requester may send exactly one message (flag flipped in the same batch)
+              get(/databases/$(database)/documents/direct_chats/$(chatId)).data.requestedBy == request.auth.uid
+              && get(/databases/$(database)/documents/direct_chats/$(chatId)).data.requestMessageSent == false
+              && getAfter(/databases/$(database)/documents/direct_chats/$(chatId)).data.requestMessageSent == true
+            )
+          );
 
         allow update: if isValidId(chatId)
           && isValidId(messageId)
@@ -524,7 +597,11 @@ service cloud.firestore {
           && isVerified()
           && exists(/databases/$(database)/documents/direct_chats/$(chatId))
           && request.auth.uid in get(/databases/$(database)/documents/direct_chats/$(chatId)).data.participantUids
-          && (existing().senderUid == request.auth.uid || isAdmin());
+          && (
+            existing().senderUid == request.auth.uid
+            || isAdmin()
+            || get(/databases/$(database)/documents/direct_chats/$(chatId)).data.get('status', 'accepted') == 'pending'
+          );
       }
 
       // Typing indicator for private chats: participants only

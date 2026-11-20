@@ -28,7 +28,7 @@ export const AvatarImg: React.FC<AvatarImgProps> = ({
     return (
       <div
         aria-label={name}
-        className={`${sizeClass} rounded-full flex items-center justify-center font-semibold text-slate-700 dark:text-slate-200 shrink-0 select-none bg-gradient-to-br from-[#FEF08A] via-[#FBCFE8] to-[#BAE6FD] dark:from-[#4B4429] dark:via-[#4A2B3D] dark:to-[#243B53] border border-white/80 dark:border-slate-700 ${className}`}
+        className={`${sizeClass} rounded-full flex items-center justify-center font-semibold text-slate-700 dark:text-slate-200 shrink-0 select-none bg-gradient-to-br from-[#FEF08A] via-[#FBCFE8] to-[#BAE6FD] dark:from-[#4B4429] dark:via-[#4A2B3D] dark:to-[#243B53] border border-slate-200 dark:border-slate-700 ${className}`}
       >
         <span className="text-xs">{initials}</span>
       </div>

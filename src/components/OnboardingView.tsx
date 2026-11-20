@@ -16,7 +16,14 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { TRANSLATIONS } from '@/src/i18n/translations';
-import { Language, SiteSettings, ThemeMode, VALIDATION_LIMITS } from '@/src/types/chat';
+import {
+  Language,
+  NICKNAME_REGEX,
+  normalizeNickname,
+  SiteSettings,
+  ThemeMode,
+  VALIDATION_LIMITS,
+} from '@/src/types/chat';
 import { hexToRgba, resolveChatBackdropStyle } from '@/src/utils/colors';
 import { assetUrl, compressAvatarFile, CURATED_AVATARS, WELCOME_BANNER_URL } from '@/src/utils/image';
 import { AvatarImg } from './AvatarImg';
@@ -126,12 +133,17 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
     setError('');
 
     const trimmedName = name.trim().slice(0, VALIDATION_LIMITS.MAX_NAME_LEN);
-    const trimmedNickname = nickname.trim().slice(0, VALIDATION_LIMITS.MAX_NICKNAME_LEN);
+    const trimmedNickname = normalizeNickname(nickname);
     const trimmedEmail = email.trim().slice(0, VALIDATION_LIMITS.MAX_EMAIL_LEN);
     const trimmedPhoto = photoUrl.trim();
 
     if (!trimmedName || !trimmedNickname || !trimmedEmail || !trimmedPhoto) {
       setError(t.profileRequiredError);
+      return;
+    }
+
+    if (!NICKNAME_REGEX.test(trimmedNickname)) {
+      setError(t.nicknameInvalid);
       return;
     }
 
@@ -174,7 +186,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
           <span className="logo-shine inline-flex rounded-[0.75rem] shadow-md rotate-[-6deg] shrink-0">
             <MacaronLogo size={42} />
           </span>
-          <span className="text-xl font-extrabold tracking-tight text-gradient whitespace-nowrap shrink-0">
+          <span className="text-xl font-bold tracking-tight text-gradient whitespace-nowrap shrink-0">
             {siteTitle}
           </span>
         </div>
@@ -183,7 +195,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
           <button
             type="button"
             onClick={() => onToggleLanguage(isRtl ? 'en' : 'ar')}
-            className="glass inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border border-white/80 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-[#262B42] shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="glass inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-[#262A36] shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             <Globe className="w-3.5 h-3.5" />
             <span>{isRtl ? 'EN' : 'عربي'}</span>
@@ -192,7 +204,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
           <button
             type="button"
             onClick={() => onToggleThemeMode(themeMode === 'light' ? 'dark' : 'light')}
-            className="glass inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border border-white/80 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-[#262B42] shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="glass inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-[#262A36] shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             {themeMode === 'light' ? (
               <>
@@ -213,14 +225,14 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
       <main className="relative z-10 flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-4 lg:py-8 flex items-center">
         <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-8 items-stretch">
           {/* Editorial Pastel Showcase Column */}
-          <div className="msg-in glass lg:col-span-5 flex flex-col justify-between rounded-[2rem] border border-white/80 dark:border-slate-700/70 p-6 lg:p-8 shadow-[0_24px_60px_-30px_rgba(236,72,153,0.5)]">
+          <div className="msg-in glass lg:col-span-5 flex flex-col justify-between rounded-2xl border border-slate-200 dark:border-slate-700/70 p-6 lg:p-8 shadow-sm">
             <div className="space-y-4">
-              <p className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-white/80 dark:bg-slate-800/80 border border-white/80 dark:border-slate-700 text-pink-600 dark:text-pink-300 shadow-xs w-fit">
+              <p className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-white/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-violet-600 dark:text-violet-300 shadow-xs w-fit">
                 <span aria-hidden="true">✨</span>
                 {t.appTagline}
               </p>
               <h1
-                className="text-3xl lg:text-4xl font-extrabold leading-tight text-gradient"
+                className="text-3xl lg:text-4xl font-bold leading-tight text-gradient"
                 style={{ textWrap: 'balance' }}
               >
                 {t.welcomeHeroTitle}
@@ -230,7 +242,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
               </p>
             </div>
 
-            <div className="mt-6 rounded-3xl overflow-hidden border-4 border-white/80 dark:border-slate-700/70 aspect-video bg-gradient-to-br from-[#FEF08A]/50 via-[#FBCFE8]/50 to-[#BAE6FD]/50 shadow-lg rotate-[-1.5deg] hover:rotate-0 transition-transform duration-500">
+            <div className="mt-6 rounded-3xl overflow-hidden border-4 border-slate-200 dark:border-slate-700/70 aspect-video bg-gradient-to-br from-[#FEF08A]/50 via-[#FBCFE8]/50 to-[#BAE6FD]/50 shadow-lg rotate-[-1.5deg] hover:rotate-0 transition-transform duration-500">
               {!bannerFailed ? (
                 <img
                   src={assetUrl(WELCOME_BANNER_URL)}
@@ -256,7 +268,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
               ].map(({ icon: Icon, label, tone }) => (
                 <li
                   key={label}
-                  className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/70 dark:bg-slate-800/60 border border-white/80 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200"
+                  className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-white/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200"
                 >
                   <span
                     className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0"
@@ -271,14 +283,14 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
           </div>
 
           {/* Interactive Profile Gate Form Column */}
-          <div className="msg-in glass-strong lg:col-span-7 rounded-[2rem] border border-white/80 dark:border-slate-700/70 p-6 lg:p-10 shadow-[0_24px_60px_-30px_rgba(14,165,233,0.45)] flex flex-col justify-center [animation-delay:80ms]">
+          <div className="msg-in glass-strong lg:col-span-7 rounded-2xl border border-slate-200 dark:border-slate-700/70 p-6 lg:p-10 shadow-sm flex flex-col justify-center [animation-delay:80ms]">
             {!user ? (
               <div className="flex flex-col items-center text-center gap-6 py-6 lg:py-10 max-w-sm mx-auto w-full">
                 <span className="logo-shine inline-flex rounded-[1.55rem] shadow-xl rotate-[-6deg] hover:rotate-0 transition-transform duration-500">
                   <MacaronLogo size={88} />
                 </span>
                 <div className="space-y-2">
-                  <h2 className="text-2xl font-extrabold text-slate-900 dark:text-slate-50">
+                  <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-50">
                     {t.step1Title}
                   </h2>
                   <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
@@ -296,13 +308,10 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                   type="button"
                   disabled={authLoading}
                   onClick={handleSignInClick}
-                  className="group w-full inline-flex items-center justify-center gap-3 px-7 py-4 rounded-full text-sm font-extrabold text-slate-900 transition-all hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.98] cursor-pointer disabled:opacity-60 shadow-lg border border-white/80"
-                  style={{
-                    background: `linear-gradient(135deg, ${settings.yellowAccent}, ${settings.pinkAccent}, ${settings.blueAccent})`,
-                  }}
+                  className="group w-full inline-flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl text-sm font-semibold transition-colors active:scale-[0.99] cursor-pointer disabled:opacity-60 shadow-sm border bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white border-transparent"
                 >
                   {authLoading ? (
-                    <span className="w-4 h-4 rounded-full border-2 border-slate-900/30 border-t-slate-900 animate-spin" />
+                    <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
                   ) : (
                     <Sparkles className="w-4 h-4" />
                   )}
@@ -375,12 +384,12 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                             onClick={() => setPhotoUrl(av.url)}
                             title={isRtl ? av.labelAr : av.labelEn}
                             className={`relative rounded-full p-0.5 transition-transform hover:scale-105 cursor-pointer ${
-                              selected ? 'ring-2 ring-offset-2 ring-pink-400 dark:ring-offset-[#1A1D2E]' : ''
+                              selected ? 'ring-2 ring-offset-2 ring-violet-400 dark:ring-offset-[#171A23]' : ''
                             }`}
                           >
                             <AvatarImg src={av.url} name={av.labelEn} sizeClass="w-10 h-10" />
                             {selected && (
-                              <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-pink-500 text-white flex items-center justify-center">
+                              <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-violet-500 text-white flex items-center justify-center">
                                 <Check className="w-2.5 h-2.5" />
                               </span>
                             )}
@@ -408,7 +417,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder={t.namePlaceholder}
-                      className="w-full px-4 py-2.5 rounded-2xl text-sm border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-[#121523] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 transition-shadow focus:outline-none focus:ring-4 focus:ring-pink-200/70 dark:focus:ring-pink-500/25"
+                      className="w-full px-4 py-2.5 rounded-2xl text-sm border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-[#11131A] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 transition-shadow focus:outline-none focus:ring-4 focus:ring-violet-200/70 dark:focus:ring-violet-500/25"
                     />
                   </div>
 
@@ -419,16 +428,24 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                     >
                       {t.nicknameLabel}
                     </label>
-                    <input
-                      id="onboard-nickname"
-                      type="text"
-                      required
-                      maxLength={VALIDATION_LIMITS.MAX_NICKNAME_LEN}
-                      value={nickname}
-                      onChange={(e) => setNickname(e.target.value)}
-                      placeholder={t.nicknamePlaceholder}
-                      className="w-full px-4 py-2.5 rounded-2xl text-sm border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-[#121523] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 transition-shadow focus:outline-none focus:ring-4 focus:ring-sky-200/70 dark:focus:ring-sky-500/25"
-                    />
+<div className="relative" dir="ltr">
+                      <span className="absolute inset-y-0 left-3.5 flex items-center text-sm font-semibold text-slate-400 pointer-events-none">@</span>
+                      <input
+                        id="onboard-nickname"
+                        type="text"
+                        required
+                        dir="ltr"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        maxLength={20}
+                        value={nickname}
+                        onChange={(e) => setNickname(normalizeNickname(e.target.value))}
+                        placeholder="nawal_99"
+                        className="w-full ps-8 pe-4 py-2.5 rounded-xl text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#11131A] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-violet-200/70 dark:focus:ring-violet-500/25 focus:border-violet-400 transition-shadow"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.nicknameHint}</p>
                   </div>
                 </div>
 
@@ -449,7 +466,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder={t.emailPlaceholder}
                     dir="ltr"
-                    className="w-full px-4 py-2.5 rounded-2xl text-sm border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-[#121523] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 transition-shadow focus:outline-none focus:ring-4 focus:ring-amber-200/70 dark:focus:ring-amber-500/25"
+                    className="w-full px-4 py-2.5 rounded-2xl text-sm border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-[#11131A] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 transition-shadow focus:outline-none focus:ring-4 focus:ring-violet-200/70 dark:focus:ring-violet-500/25"
                   />
                 </div>
 
@@ -462,10 +479,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="group w-full inline-flex items-center justify-center gap-2.5 px-6 py-4 rounded-full text-sm font-extrabold text-slate-900 transition-all hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.98] cursor-pointer disabled:opacity-60 shadow-lg border border-white/80"
-                  style={{
-                    background: `linear-gradient(135deg, ${hexToRgba(settings.yellowAccent, 0.95)}, ${hexToRgba(settings.pinkAccent, 0.95)}, ${hexToRgba(settings.blueAccent, 0.95)})`,
-                  }}
+                  className="group w-full inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl text-sm font-semibold transition-colors active:scale-[0.99] cursor-pointer disabled:opacity-60 shadow-sm border bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white border-transparent"
                 >
                   <span>{submitting ? t.savingProfile : t.startChatting}</span>
                   <DirectionalArrow className="w-4 h-4 transition-transform group-hover:translate-x-1 rtl:group-hover:-translate-x-1" />
@@ -482,17 +496,17 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
           href="https://nawal.pro"
           target="_blank"
           rel="noopener noreferrer"
-          className="font-bold text-pink-600 dark:text-pink-300 hover:underline underline-offset-2"
+          className="font-bold text-violet-600 dark:text-violet-300 hover:underline underline-offset-2"
         >
           {t.authorName}
         </a>{' '}
         <span aria-hidden="true">🩷</span> · © {new Date().getFullYear()}
         <div className="mt-1.5 flex items-center justify-center gap-3">
-          <a href="#/about" className="hover:text-pink-600 dark:hover:text-pink-300 hover:underline underline-offset-2">{t.aboutLink}</a>
+          <a href="#/about" className="hover:text-violet-600 dark:hover:text-violet-300 hover:underline underline-offset-2">{t.aboutLink}</a>
           <span aria-hidden="true">·</span>
-          <a href="#/privacy" className="hover:text-pink-600 dark:hover:text-pink-300 hover:underline underline-offset-2">{t.privacyLink}</a>
+          <a href="#/privacy" className="hover:text-violet-600 dark:hover:text-violet-300 hover:underline underline-offset-2">{t.privacyLink}</a>
           <span aria-hidden="true">·</span>
-          <a href="#/terms" className="hover:text-pink-600 dark:hover:text-pink-300 hover:underline underline-offset-2">{t.termsLink}</a>
+          <a href="#/terms" className="hover:text-violet-600 dark:hover:text-violet-300 hover:underline underline-offset-2">{t.termsLink}</a>
         </div>
       </footer>
     </div>

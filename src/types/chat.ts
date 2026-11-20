@@ -112,9 +112,23 @@ export interface DirectChat {
   participant2Photo: string;
   lastMessageText: string;
   createdBy: string;
+  /** Message requests: a new private chat starts as 'pending' until the other person accepts.
+   *  Chats created before this feature have no status and count as accepted. */
+  status?: 'pending' | 'accepted';
+  requestedBy?: string;
+  /** The requester may send exactly one message while the chat is pending */
+  requestMessageSent?: boolean;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
+
+export const isChatAccepted = (chat?: DirectChat | null) => (chat?.status ?? 'accepted') === 'accepted';
+
+/** Unique @nickname: 3–20 lowercase English letters, digits, _ or . (keep in sync with firestore.rules) */
+export const NICKNAME_REGEX = /^[a-z0-9_.]{3,20}$/;
+
+export const normalizeNickname = (raw: string) =>
+  raw.trim().replace(/^@+/, '').toLowerCase().replace(/[^a-z0-9_.]/g, '').slice(0, 20);
 
 /** read_states/{uid}: last time the user opened each conversation */
 export interface ReadState {
@@ -206,15 +220,15 @@ export const DEFAULT_SITE_SETTINGS: Omit<SiteSettings, 'updatedAt'> = {
   siteNameEn: 'Macaron',
   themeMode: 'light',
   defaultLanguage: 'ar',
-  presetId: 'cotton-candy',
-  primaryColor: '#EC4899',
-  yellowAccent: '#FEF08A',
-  pinkAccent: '#FBCFE8',
-  blueAccent: '#BAE6FD',
-  myBubbleColor: '#FCE7F3',
-  otherBubbleColor: '#E0F2FE',
-  chatBgStyle: 'pastel-blend',
-  bubbleStyle: 'cute',
+  presetId: 'custom',
+  primaryColor: '#6E56CF',
+  yellowAccent: '#FDE68A',
+  pinkAccent: '#F9C6D9',
+  blueAccent: '#C7D7FE',
+  myBubbleColor: '#6E56CF',
+  otherBubbleColor: '#FFFFFF',
+  chatBgStyle: 'soft-cream',
+  bubbleStyle: 'classic',
   updatedBy: 'system',
 };
 
@@ -228,26 +242,58 @@ export const DEFAULT_ROOMS: Array<{
 }> = [
   {
     id: 'general',
-    nameAr: 'الصالة العامة',
-    nameEn: 'General Lounge',
-    descriptionAr: 'مساحة دافئة للتعارف والأحاديث اليومية اللطيفة',
-    descriptionEn: 'Warm lounge for friendly introductions and daily conversations',
-    accentTone: 'pink',
+    nameAr: 'الأسئلة العامة',
+    nameEn: 'General Q&A',
+    descriptionAr: 'اسأل أي سؤال، وساعد غيرك بالإجابة',
+    descriptionEn: 'Ask anything and help others with answers',
+    accentTone: 'blue',
   },
   {
     id: 'stories',
-    nameAr: 'ركن الستوري والقهوة',
-    nameEn: 'Stories & Coffee',
-    descriptionAr: 'شاركوا قصصكم وأفكاركم الصباحية مع كوب قهوة',
-    descriptionEn: 'Share your favorite stories, highlights, and morning thoughts',
-    accentTone: 'yellow',
+    nameAr: 'البرمجة والتطوير',
+    nameEn: 'Programming & Dev',
+    descriptionAr: 'أسئلة الكود والأخطاء والمشاريع البرمجية',
+    descriptionEn: 'Code questions, bugs, and programming projects',
+    accentTone: 'pink',
   },
   {
     id: 'pastel-art',
-    nameAr: 'نادي الألوان والباستيل',
-    nameEn: 'Pastel Creative Club',
-    descriptionAr: 'للمحادثات الإبداعية والتصاميم والذوق الهادئ',
-    descriptionEn: 'Creative ideas, cozy aesthetics, and bright inspiration',
+    nameAr: 'الدراسة والجامعة',
+    nameEn: 'Study & University',
+    descriptionAr: 'تلخيصات ومصادر ونصائح للمذاكرة والامتحانات',
+    descriptionEn: 'Notes, resources, and tips for studying and exams',
+    accentTone: 'yellow',
+  },
+  {
+    id: 'projects',
+    nameAr: 'المشاريع والتعاون',
+    nameEn: 'Projects & Teams',
+    descriptionAr: 'اعرض مشروعك أو دوّر على فريق تشتغل معه',
+    descriptionEn: 'Share your project or find teammates',
     accentTone: 'blue',
   },
+  {
+    id: 'career',
+    nameAr: 'التدريب والوظائف',
+    nameEn: 'Internships & Careers',
+    descriptionAr: 'فرص تدريب، سير ذاتية، ونصائح للمقابلات',
+    descriptionEn: 'Internships, CVs, and interview tips',
+    accentTone: 'yellow',
+  },
 ];
+
+/** Original AI Studio room names — rooms still using them get renamed automatically by an admin session */
+export const LEGACY_ROOM_NAMES_AR: Record<string, string> = {
+  general: 'الصالة العامة',
+  stories: 'ركن الستوري والقهوة',
+  'pastel-art': 'نادي الألوان والباستيل',
+};
+
+export const ROOM_ICONS: Record<string, string> = {
+  general: '❓',
+  stories: '💻',
+  'pastel-art': '📚',
+  projects: '🤝',
+  career: '💼',
+};
+

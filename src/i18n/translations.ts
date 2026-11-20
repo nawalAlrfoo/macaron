@@ -132,6 +132,8 @@ export interface Translations {
   sendTooFast: string;
   threadTitle: string;
   searchTab: string;
+  designLockedNote: string;
+  replyingToSelf: string;
   moreActions: string;
   backAction: string;
   findPeopleCta: string;
@@ -405,6 +407,8 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     previewRoomName: 'البرمجة والتطوير',
     threadTitle: 'السؤال والإجابات',
     searchTab: 'بحث',
+    designLockedNote: 'ألوان الدردشة وشكل الفقاعات صاروا ثابتين بتصميم ماكرون الجديد (البنفسجي)، عشان يضل الشكل موحّد. من هون بتقدر تغيّر اسم الموقع والوضع الافتراضي والغرف.',
+    replyingToSelf: 'بترد على رسالتك',
     moreActions: 'خيارات أكثر',
     backAction: 'رجوع',
     findPeopleCta: 'دوّر على حدا بالـ @',
@@ -677,6 +681,8 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     previewRoomName: 'Programming & Dev',
     threadTitle: 'Question & answers',
     searchTab: 'Search',
+    designLockedNote: 'Chat colours and bubble shapes are now fixed by the new Macaron design (violet) so everything stays consistent. Here you can still change the site name, default theme and rooms.',
+    replyingToSelf: 'Replying to yourself',
     moreActions: 'More',
     backAction: 'Back',
     findPeopleCta: 'Find someone by @username',

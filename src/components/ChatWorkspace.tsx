@@ -123,6 +123,27 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
   // Phones: list screen ↔ full-screen chat (Instagram Direct style)
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
+  // Phone back button / back gesture: chat → list (instead of leaving the site)
+  const chatHistoryPushedRef = useRef(false);
+  useEffect(() => {
+    const onPop = () => {
+      if (!chatHistoryPushedRef.current) return;
+      chatHistoryPushedRef.current = false;
+      setMobileChatOpen(false);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+  useEffect(() => {
+    const isPhoneLayout = window.matchMedia?.('(max-width: 1023px)').matches;
+    if (mobileChatOpen && isPhoneLayout && !chatHistoryPushedRef.current) {
+      window.history.pushState({ macaronChat: true }, '');
+      chatHistoryPushedRef.current = true;
+    } else if (!mobileChatOpen && chatHistoryPushedRef.current) {
+      chatHistoryPushedRef.current = false;
+      window.history.back();
+    }
+  }, [mobileChatOpen]);
   const [listTab, setListTab] = useState<'chats' | 'search'>('chats');
   const [showRequests, setShowRequests] = useState(true);
   const searchInputRef = useRef<HTMLInputElement>(null);

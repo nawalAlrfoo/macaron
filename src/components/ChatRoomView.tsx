@@ -64,6 +64,7 @@ import { showToast } from '@/src/lib/toast';
 import { VoiceNote } from './VoiceNote';
 import { renderRichText, setMentionSelf } from './RichText';
 import { markSent, repliesLabel, waitForSendSlot } from '@/src/lib/send';
+import { isPhoneLike } from '@/src/lib/device';
 import { ThreadPanel } from './ThreadPanel';
 import { ProfileCard, type ProfileCardTarget } from './ProfileCard';
 import { MessageSheet, QUICK_REACTIONS } from './MessageSheet';
@@ -95,6 +96,11 @@ const TYPING_WRITE_INTERVAL_MS = 2500;
 const NEAR_BOTTOM_PX = 140;
 const PAGE_SIZE = 40;
 const MAX_LOADED = 200; // keep in sync with request.query.limit in firestore.rules
+
+/** Quote preview without formatting marks (`code`, **bold**, ```blocks```) */
+function plainQuote(text: string) {
+  return text.replace(/```[a-z0-9+#-]*\n?/gi, '').replace(/`/g, '').replace(/\*\*/g, '').replace(/\s+/g, ' ').trim();
+}
 
 /** A room message that asks something and hasn't been answered/solved yet */
 function isOpenQuestion(m: ChatMessage) {
@@ -738,8 +744,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
   const fmtSecs = (secs: number) => `${Math.floor(secs / 60)}:${String(Math.floor(secs % 60)).padStart(2, '0')}`;
 
   const handleComposerKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    const isTouch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
-    const enterSends = getPrefs().enterToSend && !isTouch;
+    const enterSends = getPrefs().enterToSend && !isPhoneLike();
     const isSendCombo = enterSends
       ? e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing
       : e.key === 'Enter' && (e.ctrlKey || e.metaKey);
@@ -935,6 +940,9 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     el: HTMLElement | null;
   } | null>(null);
   const lastTapRef = useRef<{ id: string; at: number }>({ id: '', at: 0 });
+  const lastPointerTypeRef = useRef<string>('mouse');
+  // Mouse hover tracked in JS: Tailwind v4 `hover:` is off on devices that report no hover (touch laptops)
+  const [hoverMsgId, setHoverMsgId] = useState<string | null>(null);
   const SWIPE_REPLY_PX = 56;
 
   const vibrate = (ms = 10) => {
@@ -965,7 +973,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     const now = Date.now();
     const last = lastTapRef.current;
     // touch screens: two taps = like (mouse users get onDoubleClick)
-    if (window.matchMedia?.('(pointer: coarse)').matches && last.id === msg.id && now - last.at < 320) {
+    if (lastPointerTypeRef.current !== 'mouse' && last.id === msg.id && now - last.at < 320) {
       lastTapRef.current = { id: '', at: 0 };
       likeMessage(msg);
       return;
@@ -983,6 +991,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
   };
 
   const onBubblePointerDown = (e: React.PointerEvent<HTMLDivElement>, msg: ChatMessage) => {
+    lastPointerTypeRef.current = e.pointerType;
     if (e.pointerType === 'mouse' || editingMsgId === msg.id) return;
     const el = e.currentTarget;
     const g = { id: msg.id, x: e.clientX, y: e.clientY, timer: 0, dx: 0, swiping: false, longPressed: false, el };
@@ -1127,6 +1136,8 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
       <div
         key={msg.id}
         data-msg-id={msg.id}
+        onMouseEnter={() => setHoverMsgId(msg.id)}
+        onMouseLeave={() => setHoverMsgId((cur) => (cur === msg.id ? null : cur))}
         className={`msg-in group relative flex items-end gap-2 ${isMine ? 'flex-row-reverse' : 'flex-row'} ${
           withPrev ? 'mt-[3px]' : 'mt-3'
         }`}
@@ -1168,7 +1179,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
               }`}
             >
               <span className="block text-[10.5px] font-semibold opacity-80">↩ {msg.replyToSender}</span>
-              <span className="block truncate max-w-[16rem]">{msg.replyToText}</span>
+              <span className="block truncate max-w-[16rem]">{plainQuote(msg.replyToText)}</span>
             </button>
           )}
 
@@ -1182,7 +1193,9 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
               onClick={() => onBubbleTap(msg)}
               onDoubleClick={() => likeMessage(msg)}
               onContextMenu={(e) => {
-                if (window.matchMedia?.('(pointer: coarse)').matches) e.preventDefault();
+                if (editingMsgId === msg.id) return;
+                e.preventDefault();
+                if (lastPointerTypeRef.current === 'mouse') setSheetMsg(msg);
               }}
               style={
                 imageOnly
@@ -1280,7 +1293,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
             </div>
 
             {/* Hover tools (mouse only) */}
-            <div className="hidden [@media(hover:hover)]:flex items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
+            <div className={`hidden sm:flex items-center transition-opacity shrink-0 ${hoverMsgId === msg.id || reactPickerFor === msg.id ? 'opacity-100' : 'opacity-0 focus-within:opacity-100'}`}>
               <button type="button" onClick={() => setReactPickerFor((c) => (c === msg.id ? null : msg.id))} title={t.reactAction} aria-label={t.reactAction} className={hoverBtn}>
                 <SmilePlus className="w-4 h-4" />
               </button>
@@ -1516,7 +1529,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
           <div className="msg-in mb-2 ps-4 pe-2 py-2 flex items-center justify-between gap-3 text-xs">
             <div className="min-w-0">
               <div className="font-semibold text-slate-900 dark:text-slate-100">
-                {t.replyingTo} {replyTo.senderUid === myUid ? t.youLabel : replyTo.senderName}
+                {replyTo.senderUid === myUid ? t.replyingToSelf : `${t.replyingTo} ${replyTo.senderName}`}
               </div>
               <div className="truncate text-slate-500 dark:text-slate-400">{replyTo.text || (replyTo.audioUrl ? t.voiceMessage : t.photoSentPreview)}</div>
             </div>

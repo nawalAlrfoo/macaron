@@ -399,8 +399,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
             </div>
 
-            {/* Pastel Presets */}
-            <div className="space-y-2.5 pt-2">
+            {/* Colours & bubble shapes are fixed by the Instagram-style design (v3) */}
+            <p className="flex items-start gap-2 p-3 rounded-xl bg-[var(--primary-soft)] text-xs leading-relaxed text-slate-700 dark:text-slate-200">
+              <span aria-hidden="true">🎨</span>
+              <span>{t.designLockedNote}</span>
+            </p>
+
+            {/* Pastel Presets (hidden: not used by the v3 design) */}
+            <div className="hidden space-y-2.5 pt-2">
               <span className="block text-xs font-semibold text-slate-600 dark:text-slate-300">
                 {t.presetsLabel}
               </span>
@@ -441,8 +447,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
             </div>
 
-            {/* Custom Hex Pickers */}
-            <div className="space-y-3 pt-2">
+            {/* Custom Hex Pickers (hidden: not used by the v3 design) */}
+            <div className="hidden space-y-3 pt-2">
               <span className="block text-xs font-semibold text-slate-600 dark:text-slate-300">
                 {t.adminColorsSection}
               </span>
@@ -477,8 +483,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
             </div>
 
-            {/* Backdrop & Bubble Shape */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+            {/* Backdrop & Bubble Shape (hidden: not used by the v3 design) */}
+            <div className="hidden grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                   {t.chatBgStyleLabel}
@@ -521,13 +527,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           {/* Right 5 Cols: Live Preview + Publish */}
           <div className="xl:col-span-5 space-y-4 msg-in glass-strong rounded-2xl border border-slate-200 dark:border-slate-700/70 shadow-sm p-6">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-50">
+            <h3 className="hidden text-sm font-bold text-slate-900 dark:text-slate-50">
               {t.livePreviewLabel}
             </h3>
 
             <div
               style={previewBackdrop}
-              className="rounded-2xl border border-slate-200/80 dark:border-slate-700 p-5 space-y-4 min-h-[260px] flex flex-col justify-between"
+              className="hidden rounded-2xl border border-slate-200/80 dark:border-slate-700 p-5 space-y-4 min-h-[260px] flex flex-col justify-between"
             >
               <div className="space-y-3">
                 {/* Incoming Sample */}

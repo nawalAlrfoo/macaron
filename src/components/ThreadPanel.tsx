@@ -7,6 +7,7 @@ import { useProfilePhotos } from '@/src/lib/profiles';
 import { repliesLabel, sendRoomReply } from '@/src/lib/send';
 import { showToast } from '@/src/lib/toast';
 import { getPrefs } from '@/src/lib/prefs';
+import { isPhoneLike } from '@/src/lib/device';
 import { ChatMessage, Language, UserPublicProfile, VALIDATION_LIMITS } from '@/src/types/chat';
 import { AvatarImg } from './AvatarImg';
 import { renderRichText } from './RichText';
@@ -153,8 +154,7 @@ export const ThreadPanel: React.FC<ThreadPanelProps> = ({
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    const isTouch = window.matchMedia?.('(pointer: coarse)').matches;
-    const enterSends = getPrefs().enterToSend && !isTouch;
+    const enterSends = getPrefs().enterToSend && !isPhoneLike();
     if (enterSends ? e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing : e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       void send();

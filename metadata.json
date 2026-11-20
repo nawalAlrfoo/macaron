@@ -1,0 +1,8 @@
+{
+  "name": "ماكرون",
+  "description": "A charming bilingual Arabic and English web chat app with pastel yellow, pink, and blue styling, real-time Firestore messaging, profile onboarding, day/night mode, and an admin theme control panel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

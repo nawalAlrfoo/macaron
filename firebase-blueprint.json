@@ -1,0 +1,559 @@
+{
+  "entities": {
+    "UserPublicProfile": {
+      "title": "UserPublicProfile",
+      "description": "Public chat profile visible to other verified chat participants without PII.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "nickname": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "photoUrl": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60000
+        },
+        "status": {
+          "type": "string",
+          "enum": ["online", "away"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "name", "nickname", "photoUrl", "status", "createdAt", "updatedAt"]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Isolated private PII record containing the user's contact email.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 120,
+          "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "createdAt", "updatedAt"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Explicit registry of users with administrator privileges.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 120
+        },
+        "grantedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "grantedBy", "createdAt"]
+    },
+    "SiteSettings": {
+      "title": "SiteSettings",
+      "description": "Global site appearance, pastel color palette, day/night mode, and language defaults controlled by administrators.",
+      "type": "object",
+      "properties": {
+        "siteNameAr": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "siteNameEn": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "themeMode": {
+          "type": "string",
+          "enum": ["light", "dark"]
+        },
+        "defaultLanguage": {
+          "type": "string",
+          "enum": ["ar", "en"]
+        },
+        "presetId": {
+          "type": "string",
+          "enum": ["cotton-candy", "lemon-berry", "cloudy-macaron", "twilight-sorbet", "custom"]
+        },
+        "primaryColor": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 9,
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "yellowAccent": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 9,
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "pinkAccent": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 9,
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "blueAccent": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 9,
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "myBubbleColor": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 9,
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "otherBubbleColor": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 9,
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "chatBgStyle": {
+          "type": "string",
+          "enum": ["pastel-blend", "soft-cream", "soft-sky", "soft-blush", "soft-butter"]
+        },
+        "bubbleStyle": {
+          "type": "string",
+          "enum": ["cute", "classic", "pill"]
+        },
+        "updatedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "siteNameAr",
+        "siteNameEn",
+        "themeMode",
+        "defaultLanguage",
+        "presetId",
+        "primaryColor",
+        "yellowAccent",
+        "pinkAccent",
+        "blueAccent",
+        "myBubbleColor",
+        "otherBubbleColor",
+        "chatBgStyle",
+        "bubbleStyle",
+        "updatedBy",
+        "updatedAt"
+      ]
+    },
+    "ChatRoom": {
+      "title": "ChatRoom",
+      "description": "A pastel-themed group chat channel.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "nameAr": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "nameEn": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "descriptionAr": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 160
+        },
+        "descriptionEn": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 160
+        },
+        "accentTone": {
+          "type": "string",
+          "enum": ["yellow", "pink", "blue"]
+        },
+        "createdBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "nameAr",
+        "nameEn",
+        "descriptionAr",
+        "descriptionEn",
+        "accentTone",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "A real-time group chat message supporting text and optional compressed photos.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "roomId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "senderUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "senderName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "senderNickname": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "senderPhoto": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60000
+        },
+        "text": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 1000
+        },
+        "imageUrl": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 250000
+        },
+        "replyToId": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 128
+        },
+        "replyToSender": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 60
+        },
+        "replyToText": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 200
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "roomId",
+        "senderUid",
+        "senderName",
+        "senderNickname",
+        "senderPhoto",
+        "text",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "DirectChat": {
+      "title": "DirectChat",
+      "description": "A private 1-on-1 conversation thread between two verified users.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "participantUids": {
+          "type": "array"
+        },
+        "participant1Uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "participant1Name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "participant1Nickname": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "participant1Photo": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60000
+        },
+        "participant2Uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "participant2Name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "participant2Nickname": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "participant2Photo": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60000
+        },
+        "lastMessageText": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 200
+        },
+        "createdBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "participantUids",
+        "participant1Uid",
+        "participant1Name",
+        "participant1Nickname",
+        "participant1Photo",
+        "participant2Uid",
+        "participant2Name",
+        "participant2Nickname",
+        "participant2Photo",
+        "lastMessageText",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "DirectMessage": {
+      "title": "DirectMessage",
+      "description": "A private 1-on-1 message supporting text and optional compressed photos.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "chatId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "participantUids": {
+          "type": "array"
+        },
+        "senderUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "senderName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "senderNickname": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "senderPhoto": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60000
+        },
+        "text": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 1000
+        },
+        "imageUrl": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 250000
+        },
+        "replyToId": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 128
+        },
+        "replyToSender": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 60
+        },
+        "replyToText": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 200
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "chatId",
+        "participantUids",
+        "senderUid",
+        "senderName",
+        "senderNickname",
+        "senderPhoto",
+        "text",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users_public/{userId}": {
+      "schema": { "$ref": "#/entities/UserPublicProfile" },
+      "description": "Public profile directory (name, nickname, avatar, online status) with no PII."
+    },
+    "/users_private/{userId}": {
+      "schema": { "$ref": "#/entities/UserPrivateInfo" },
+      "description": "Isolated PII storage for user email addresses, readable only by owner or admin."
+    },
+    "/admins/{userId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Admin role assignment documents."
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/SiteSettings" },
+      "description": "Global site appearance and chat color settings stored at settings/theme."
+    },
+    "/rooms/{roomId}": {
+      "schema": { "$ref": "#/entities/ChatRoom" },
+      "description": "Group chat rooms directory."
+    },
+    "/rooms/{roomId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "Messages belonging to a specific group chat room."
+    },
+    "/direct_chats/{chatId}": {
+      "schema": { "$ref": "#/entities/DirectChat" },
+      "description": "Private 1-on-1 chat threads between two participants."
+    },
+    "/direct_chats/{chatId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/DirectMessage" },
+      "description": "Private messages belonging to a specific 1-on-1 chat."
+    }
+  }
+}

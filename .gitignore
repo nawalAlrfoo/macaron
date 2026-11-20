@@ -1,0 +1,20 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+
+# Local backup of files changed in v1.1
+_backup_original/
+
+# Stray local files
+*.zip
+sedKRozR7

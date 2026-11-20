@@ -1,0 +1,197 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --pastel-yellow: #FEF08A;
+    --pastel-pink: #FBCFE8;
+    --pastel-blue: #BAE6FD;
+    --pastel-primary: #F472B6;
+    --my-bubble: #FCE7F3;
+    --other-bubble: #E0F2FE;
+  }
+
+  html {
+    font-family: "Plus Jakarta Sans", "Cairo", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html[dir="rtl"] {
+    font-family: "Cairo", "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: #FFFDF8;
+    background-image:
+      radial-gradient(circle at 0% 0%, rgba(254, 240, 138, 0.35) 0%, transparent 38%),
+      radial-gradient(circle at 100% 0%, rgba(251, 207, 232, 0.4) 0%, transparent 40%),
+      radial-gradient(circle at 50% 100%, rgba(186, 230, 253, 0.38) 0%, transparent 45%);
+    background-attachment: fixed;
+    color: #1E293B;
+    transition: background-color 180ms cubic-bezier(0.16, 1, 0.3, 1), color 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  html.dark body {
+    background-color: #11131E;
+    background-image:
+      radial-gradient(circle at 0% 0%, rgba(254, 240, 138, 0.05) 0%, transparent 38%),
+      radial-gradient(circle at 100% 0%, rgba(244, 114, 182, 0.07) 0%, transparent 40%),
+      radial-gradient(circle at 50% 100%, rgba(56, 189, 248, 0.06) 0%, transparent 45%);
+    color: #F1F5F9;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.font-mono-tabular {
+  font-family: "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Soft custom scrollbar for chat stream */
+.pastel-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.pastel-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.pastel-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+}
+.pastel-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.55);
+}
+
+/* ============================================================
+   Macaron v1.2 — visual refresh
+   ============================================================ */
+
+::selection {
+  background: rgba(244, 114, 182, 0.28);
+}
+
+:focus-visible {
+  outline: 2px solid rgba(244, 114, 182, 0.7);
+  outline-offset: 2px;
+}
+
+@layer components {
+/* Frosted glass surfaces */
+.glass {
+  background-color: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+}
+html.dark .glass {
+  background-color: rgba(23, 26, 42, 0.72);
+}
+
+.glass-strong {
+  background-color: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(22px) saturate(1.5);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+}
+html.dark .glass-strong {
+  background-color: rgba(26, 29, 46, 0.88);
+}
+
+/* Gradient text for headings */
+.text-gradient {
+  background-image: linear-gradient(120deg, #db2777 0%, #f59e0b 50%, #0284c7 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+html.dark .text-gradient {
+  background-image: linear-gradient(120deg, #f9a8d4 0%, #fde68a 50%, #7dd3fc 100%);
+}
+}
+
+@layer components {
+/* Soft floating blobs (onboarding & empty states) */
+.pastel-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(48px);
+  opacity: 0.55;
+  pointer-events: none;
+  animation: pastel-float 14s ease-in-out infinite;
+}
+html.dark .pastel-blob {
+  opacity: 0.18;
+}
+
+@keyframes pastel-float {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  33% { transform: translate3d(24px, -18px, 0) scale(1.06); }
+  66% { transform: translate3d(-18px, 14px, 0) scale(0.96); }
+}
+
+/* Message entrance */
+.msg-in {
+  animation: msg-in 260ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Little pop for reactions / badges */
+.pop-in {
+  animation: pop-in 220ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Logo shimmer */
+.logo-shine {
+  position: relative;
+  overflow: hidden;
+}
+.logo-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.75) 50%, transparent 70%);
+  transform: translateX(-120%);
+  animation: logo-shine 5s ease-in-out infinite;
+}
+@keyframes logo-shine {
+  0%, 70% { transform: translateX(-120%); }
+  85%, 100% { transform: translateX(120%); }
+}
+
+/* Unread pulse */
+.unread-pulse {
+  box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.55);
+  animation: unread-pulse 2.2s ease-out infinite;
+}
+@keyframes unread-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.5); }
+  70% { box-shadow: 0 0 0 6px rgba(236, 72, 153, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); }
+}
+
+/* Thin scrollbar also in Firefox */
+.pastel-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

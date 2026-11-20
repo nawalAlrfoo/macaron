@@ -1,5 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/src/lib/firebase';
+import { unblockUser } from '@/src/lib/moderation';
 import {
+  Ban,
   Bell,
   Check,
   Copy,
@@ -27,6 +31,7 @@ interface UserSettingsModalProps {
   onChangeThemeMode: (mode: ThemeMode) => void;
   onEditProfile: () => void;
   onSignOut: () => void;
+  blockedUids: string[];
   onClose: () => void;
 }
 
@@ -117,6 +122,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   onChangeThemeMode,
   onEditProfile,
   onSignOut,
+  blockedUids,
   onClose,
 }) => {
   const t = TRANSLATIONS[language];
@@ -126,6 +132,27 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   const [notifDenied, setNotifDenied] = useState(
     notifSupported && Notification.permission === 'denied'
   );
+
+  // Names for the blocked list
+  const [blockedProfiles, setBlockedProfiles] = useState<Record<string, UserPublicProfile>>({});
+  useEffect(() => {
+    let cancelled = false;
+    blockedUids.forEach(async (uid) => {
+      if (blockedProfiles[uid]) return;
+      try {
+        const snap = await getDoc(doc(db, 'users_public', uid));
+        if (!cancelled && snap.exists()) {
+          setBlockedProfiles((p) => ({ ...p, [uid]: snap.data() as UserPublicProfile }));
+        }
+      } catch {
+        // ignore
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blockedUids.join(',')]);
 
   const themeValue: UserPrefs['theme'] = prefs.theme ?? themeMode;
 
@@ -276,6 +303,34 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                 label={t.settingsEnterToSend}
               />
             </Row>
+          </Section>
+
+          <Section icon={<Ban className="w-3.5 h-3.5" />} title={t.blockedListTitle}>
+            {blockedUids.length === 0 ? (
+              <div className="px-4 py-3 bg-white dark:bg-[#171A23] text-xs text-slate-500 dark:text-slate-400">
+                {t.blockedListEmpty}
+              </div>
+            ) : (
+              blockedUids.map((uid) => {
+                const p = blockedProfiles[uid];
+                return (
+                  <div key={uid} className="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-[#171A23]">
+                    <AvatarImg src={p?.photoUrl} name={p?.name ?? '?'} sizeClass="w-8 h-8" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm text-slate-800 dark:text-slate-100 truncate">{p?.name ?? '…'}</div>
+                      {p && <div className="text-[11px] text-slate-500" dir="ltr">@{p.nickname}</div>}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => unblockUser(profile.uid, uid)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-[#262A36] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1E2230] cursor-pointer"
+                    >
+                      {t.unblockAction}
+                    </button>
+                  </div>
+                );
+              })
+            )}
           </Section>
 
           <button

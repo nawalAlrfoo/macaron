@@ -33,6 +33,7 @@ import {
   resolveChatBackdropStyle,
 } from '@/src/utils/colors';
 import { AvatarImg } from './AvatarImg';
+import { ReportsPanel } from './ReportsPanel';
 
 interface AdminPanelProps {
   currentUid: string;
@@ -223,7 +224,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   ];
 
   return (
-    <div className="h-full overflow-y-auto pastel-scroll p-6 lg:p-8 space-y-8 bg-[#FFFDF9] dark:bg-[#131624]">
+    <div className="h-full overflow-y-auto pastel-scroll p-6 lg:p-8 space-y-8 bg-[var(--app-bg)]">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-200/80 dark:border-slate-800">
         <div>
@@ -276,6 +277,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <span>{t.themeSavedToast}</span>
         </div>
       )}
+
+      {/* Reports from members */}
+      <ReportsPanel language={language} />
 
       {/* Theme & Color Studio Form */}
       <form onSubmit={handleSaveSettings} className="space-y-8">

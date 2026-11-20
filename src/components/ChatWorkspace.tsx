@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   collection,
+  deleteDoc,
   doc,
   getDocs,
   limit,
@@ -13,7 +14,9 @@ import {
   type Timestamp,
 } from 'firebase/firestore';
 import {
+  Ban,
   Edit2,
+  Flag,
   Search,
   Globe,
   Hash,
@@ -31,6 +34,8 @@ import {
 import { TRANSLATIONS } from '@/src/i18n/translations';
 import { db } from '@/src/lib/firebase';
 import { getPrefs, playChime } from '@/src/lib/prefs';
+import { blockUser, useBlockedUids } from '@/src/lib/moderation';
+import { ReportDialog, type ReportTarget } from './ReportDialog';
 import {
   AccentTone,
   AdminRecord,
@@ -251,6 +256,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     setStartingDmUid(member.uid);
     try {
       const chatId = await onStartDirectChat(member);
+      if (!chatId) return;
       setSelectedDirectChatId(chatId);
       setActiveView('direct');
       setMobileSidebarOpen(false);
@@ -261,6 +267,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
   // Privacy: no open member list — people are found only by their unique @nickname
   const memberQuery = normalizeNickname(memberFilter);
+  const blockedRef = useRef<string[]>([]);
   const [otherMembers, setOtherMembers] = useState<UserPublicProfile[]>([]);
   const [searching, setSearching] = useState(false);
   useEffect(() => {
@@ -283,7 +290,9 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         );
         if (cancelled) return;
         setOtherMembers(
-          snap.docs.map((d) => d.data() as UserPublicProfile).filter((m) => m.uid !== myUid)
+          snap.docs
+            .map((d) => d.data() as UserPublicProfile)
+            .filter((m) => m.uid !== myUid && !blockedRef.current.includes(m.uid))
         );
       } catch (err) {
         console.warn('Nickname search failed:', err);
@@ -298,8 +307,38 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     };
   }, [memberQuery, myUid]);
 
-  const incomingRequests = directChats.filter((c) => !isChatAccepted(c) && c.requestedBy !== myUid);
-  const visibleChats = directChats.filter((c) => isChatAccepted(c) || c.requestedBy === myUid);
+  const blockedUids = useBlockedUids(myUid);
+  blockedRef.current = blockedUids;
+  const peerOf = (c: DirectChat) => (c.participant1Uid === myUid ? c.participant2Uid : c.participant1Uid);
+  const notBlocked = (c: DirectChat) => !blockedUids.includes(peerOf(c));
+  const incomingRequests = directChats.filter(
+    (c) => !isChatAccepted(c) && c.requestedBy !== myUid && notBlocked(c)
+  );
+  const visibleChats = directChats.filter(
+    (c) => (isChatAccepted(c) || c.requestedBy === myUid) && notBlocked(c)
+  );
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
+  const [confirmBlockUid, setConfirmBlockUid] = useState<string | null>(null);
+
+  const handleConfirmBlock = async () => {
+    const uid = confirmBlockUid;
+    setConfirmBlockUid(null);
+    if (!uid) return;
+    // a pending request from/to this person is removed too
+    const chat = directChats.find((c) => peerOf(c) === uid);
+    await blockUser(myUid, uid);
+    if (chat && !isChatAccepted(chat)) {
+      try {
+        await deleteDoc(doc(db, 'direct_chats', chat.id));
+      } catch {
+        // the request may have its message still; it stays hidden anyway
+      }
+    }
+    if (activeDirectChat && peerOf(activeDirectChat) === uid) {
+      setSelectedDirectChatId(null);
+      setActiveView('room');
+    }
+  };
 
   const activeDirectPeer = activeDirectChat ? getOtherParticipant(activeDirectChat) : null;
 
@@ -750,6 +789,31 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                     )}
                   </p>
                 </div>
+                <div className="flex items-center gap-1 ms-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setReportTarget({
+                        uid: activeDirectPeer.uid,
+                        name: activeDirectPeer.name,
+                        nickname: activeDirectPeer.nickname,
+                        chatId: activeDirectChat?.id,
+                      })
+                    }
+                    title={t.reportAction}
+                    className="p-2 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer"
+                  >
+                    <Flag className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmBlockUid(activeDirectPeer.uid)}
+                    title={t.blockAction}
+                    className="p-2 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer"
+                  >
+                    <Ban className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ) : activeRoom ? (
               <div className="flex items-center gap-3 min-w-0">
@@ -837,6 +901,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
             themeMode={themeMode}
             settings={settings}
             onMarkRead={handleMarkRead}
+            blockedUids={blockedUids}
             onLeaveChat={() => {
               setSelectedDirectChatId(null);
               setActiveView('room');
@@ -852,6 +917,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
             themeMode={themeMode}
             settings={settings}
             onMarkRead={handleMarkRead}
+            blockedUids={blockedUids}
           />
         ) : null}
       </div>
@@ -881,8 +947,42 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
             setShowEditProfile(true);
           }}
           onSignOut={onSignOut}
+          blockedUids={blockedUids}
           onClose={() => setShowSettingsModal(false)}
         />
+      )}
+
+      {reportTarget && (
+        <ReportDialog
+          language={language}
+          myUid={myUid}
+          target={reportTarget}
+          onClose={() => setReportTarget(null)}
+          onBlocked={() => {
+            setSelectedDirectChatId(null);
+            setActiveView('room');
+          }}
+        />
+      )}
+
+      {confirmBlockUid && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" onClick={() => setConfirmBlockUid(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm msg-in rounded-2xl border border-slate-200 dark:border-[#262A36] bg-white dark:bg-[#171A23] shadow-xl p-6 space-y-4">
+            <h2 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-50">
+              <Ban className="w-4 h-4 text-rose-500" />
+              {t.blockConfirmTitle}
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{t.blockConfirmText}</p>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setConfirmBlockUid(null)} className="px-4 py-2 rounded-lg text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
+                {t.cancelAction}
+              </button>
+              <button type="button" onClick={handleConfirmBlock} className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-rose-500 hover:bg-rose-600 cursor-pointer">
+                {t.blockAction}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,19 +1,21 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   collection,
   deleteDoc,
   deleteField,
   doc,
+  limit,
   onSnapshot,
+  orderBy,
   query,
   serverTimestamp,
   setDoc,
   updateDoc,
-  where,
   writeBatch,
 } from 'firebase/firestore';
 import {
   ArrowDown,
+  Flag,
   Mic,
   Square,
   Check,
@@ -53,6 +55,7 @@ import {
 import { compressChatPhotoFile } from '@/src/utils/image';
 import { getPrefs } from '@/src/lib/prefs';
 import { VoiceNote } from './VoiceNote';
+import { ReportDialog, type ReportTarget } from './ReportDialog';
 import { AvatarImg } from './AvatarImg';
 import { MacaronLogo } from './MacaronLogo';
 
@@ -69,11 +72,15 @@ interface ChatRoomViewProps {
   onMarkRead?: (key: string) => void;
   /** Called after the current user declines/cancels a pending request (chat is deleted) */
   onLeaveChat?: () => void;
+  /** Messages from these people are hidden */
+  blockedUids?: string[];
 }
 
 const QUICK_EMOJIS = ['✨', '💛', '🩷', '🩵', '🌸', '☁️', '☕', '😊', '🫶', '🌟'];
 const TYPING_WRITE_INTERVAL_MS = 2500;
 const NEAR_BOTTOM_PX = 140;
+const PAGE_SIZE = 40;
+const MAX_LOADED = 200; // keep in sync with request.query.limit in firestore.rules
 
 // http(s) links; trailing punctuation is left outside the link
 const URL_SPLIT_RE = /(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"])/g;
@@ -119,6 +126,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
   settings,
   onMarkRead,
   onLeaveChat,
+  blockedUids,
 }) => {
   const t = TRANSLATIONS[language];
   const isRtl = language === 'ar';
@@ -181,6 +189,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   // UX state
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [reactPickerFor, setReactPickerFor] = useState<string | null>(null);
   const [actionsOpenFor, setActionsOpenFor] = useState<string | null>(null);
@@ -210,11 +219,21 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     onMarkRead(readKey(mode, targetId));
   }, [mode, targetId, onMarkRead]);
 
-  // ---------- Messages listener ----------
+  // ---------- Messages listener (paged: newest PAGE_SIZE, older on demand) ----------
+  const [pageLimit, setPageLimit] = useState(PAGE_SIZE);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const scrollRestoreRef = useRef<{ height: number; top: number } | null>(null);
+  const lastMsgIdRef = useRef<string | null>(null);
+
+  // reset per conversation
   useEffect(() => {
     if (!targetId) return;
-
     setLoading(true);
+    setPageLimit(PAGE_SIZE);
+    setHasMore(false);
+    lastMsgIdRef.current = null;
+    scrollRestoreRef.current = null;
     setReplyTo(null);
     setEditingMsgId(null);
     setAttachedPhoto(null);
@@ -226,13 +245,14 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     setHasNewBelow(false);
     nearBottomRef.current = true;
     prevCountRef.current = 0;
+  }, [mode, targetId]);
 
+  useEffect(() => {
+    if (!targetId) return;
     const collectionPath = `${baseCollection}/${targetId}/messages`;
 
-    const q =
-      mode === 'room'
-        ? query(collection(db, collectionPath), where('roomId', '==', targetId))
-        : query(collection(db, collectionPath), where('participantUids', 'array-contains', myUid));
+    // Single-field ordering → no composite index needed (access is checked by the rules on the parent)
+    const q = query(collection(db, collectionPath), orderBy('createdAt', 'desc'), limit(pageLimit));
 
     const unsub = onSnapshot(
       q,
@@ -244,16 +264,36 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
           return ta - tb;
         });
         setMessages(list);
+        setHasMore(snapshot.size >= pageLimit && pageLimit < MAX_LOADED);
         setLoading(false);
+        setLoadingOlder(false);
       },
       (err) => {
         setLoading(false);
+        setLoadingOlder(false);
         handleFirestoreError(err, OperationType.LIST, collectionPath);
       }
     );
 
     return () => unsub();
-  }, [mode, targetId, baseCollection, myUid]);
+  }, [targetId, baseCollection, pageLimit]);
+
+  const loadOlder = () => {
+    if (!hasMore || loadingOlder) return;
+    const el = scrollRef.current;
+    if (el) scrollRestoreRef.current = { height: el.scrollHeight, top: el.scrollTop };
+    setLoadingOlder(true);
+    setPageLimit((n) => Math.min(n + PAGE_SIZE, MAX_LOADED));
+  };
+
+  // keep the reading position when older messages are added on top
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    const saved = scrollRestoreRef.current;
+    if (!el || !saved) return;
+    el.scrollTop = el.scrollHeight - saved.height + saved.top;
+    scrollRestoreRef.current = null;
+  }, [messages]);
 
   // Mark as read when new messages arrive or the tab becomes visible again
   useEffect(() => {
@@ -354,6 +394,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     if (!el) return;
     const near = el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX;
     nearBottomRef.current = near;
+    if (el.scrollTop < 80 && hasMore && !loadingOlder && !loading) loadOlder();
     if (near) setHasNewBelow(false);
   };
 
@@ -361,9 +402,13 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     if (loading) return;
     const prev = prevCountRef.current;
     prevCountRef.current = messages.length;
-    if (messages.length <= prev) return;
-
     const last = messages[messages.length - 1];
+    const lastId = last?.id ?? null;
+    const sameLast = lastId === lastMsgIdRef.current;
+    lastMsgIdRef.current = lastId;
+    if (messages.length <= prev) return;
+    if (prev > 0 && sameLast) return; // older page prepended — not a new message
+
     if (prev === 0) {
       // first load of this conversation: jump without animation
       requestAnimationFrame(() => scrollToBottom(false));
@@ -721,15 +766,17 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
   };
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
+  const blockedSet = useMemo(() => new Set(blockedUids ?? []), [blockedUids]);
   const visibleMessages = useMemo(() => {
-    if (!normalizedQuery) return messages;
-    return messages.filter(
+    const base = blockedSet.size ? messages.filter((m) => !blockedSet.has(m.senderUid)) : messages;
+    if (!normalizedQuery) return base;
+    return base.filter(
       (m) =>
         m.text?.toLowerCase().includes(normalizedQuery) ||
         m.senderName?.toLowerCase().includes(normalizedQuery) ||
         m.senderNickname?.toLowerCase().includes(normalizedQuery)
     );
-  }, [messages, normalizedQuery]);
+  }, [messages, normalizedQuery, blockedSet]);
 
   const backdropStyle = resolveChatBackdropStyle(settings, themeMode);
   const myBg = resolveBubbleSurface(settings.myBubbleColor, themeMode);
@@ -1020,6 +1067,27 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
               >
                 <SmilePlus className="w-3.5 h-3.5" />
               </button>
+              {!isMine && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActionsOpenFor(null);
+                    setReportTarget({
+                      uid: msg.senderUid,
+                      name: msg.senderName,
+                      nickname: msg.senderNickname,
+                      roomId: mode === 'room' ? targetId : undefined,
+                      chatId: mode === 'direct' ? targetId : undefined,
+                      messageId: msg.id,
+                      messageText: msg.text || (msg.audioUrl ? t.voiceMessage : msg.imageUrl ? t.photoSentPreview : ''),
+                    });
+                  }}
+                  title={t.reportAction}
+                  className={`${actionBtn} hover:!text-rose-500`}
+                >
+                  <Flag className="w-3.5 h-3.5" />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -1165,7 +1233,21 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
             {t.searchNoResults}
           </div>
         ) : (
-          streamItems
+          <>
+            {hasMore && (
+              <div className="flex justify-center pb-2">
+                <button
+                  type="button"
+                  onClick={loadOlder}
+                  disabled={loadingOlder}
+                  className="px-4 py-1.5 rounded-full text-[11px] font-medium border border-slate-200 dark:border-[#262A36] bg-white dark:bg-[#171A23] text-slate-500 dark:text-slate-400 hover:text-[var(--primary)] cursor-pointer disabled:opacity-60"
+                >
+                  {loadingOlder ? t.loadingMessages : t.loadOlderMessages}
+                </button>
+              </div>
+            )}
+            {streamItems}
+          </>
         )}
         <div ref={bottomRef} />
       </div>
@@ -1416,6 +1498,15 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         </>
         )}
       </div>
+
+      {reportTarget && (
+        <ReportDialog
+          language={language}
+          myUid={myUid}
+          target={reportTarget}
+          onClose={() => setReportTarget(null)}
+        />
+      )}
 
       {/* Full-Size Photo Lightbox Modal */}
       {lightboxImage && (

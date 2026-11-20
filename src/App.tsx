@@ -29,6 +29,7 @@ import { ChatWorkspace } from '@/src/components/ChatWorkspace';
 import { ErrorBoundary } from '@/src/components/ErrorBoundary';
 import { OnboardingView } from '@/src/components/OnboardingView';
 import { MacaronLogo } from '@/src/components/MacaronLogo';
+import { Toaster } from '@/src/components/Toaster';
 import { InfoPage, type InfoPageId } from '@/src/components/InfoPage';
 import { TRANSLATIONS } from '@/src/i18n/translations';
 import { setPrefs, usePrefs } from '@/src/lib/prefs';
@@ -541,6 +542,7 @@ function MacaronApp() {
         throw new Error(t.nicknameTaken);
       }
       handleFirestoreError(err, OperationType.WRITE, `users_public/${user.uid}`);
+      throw new Error(t.errGeneric);
     }
   };
 
@@ -580,6 +582,7 @@ function MacaronApp() {
       return chatId;
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `direct_chats/${chatId}`);
+      return '';
     }
   };
 
@@ -769,6 +772,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <MacaronApp />
+      <Toaster />
     </ErrorBoundary>
   );
 }

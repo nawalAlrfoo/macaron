@@ -126,6 +126,39 @@ export interface Translations {
   noDirectChatsYet: string;
   groupChatBadge: string;
   privateChatBadge: string;
+  errPermission: string;
+  errOffline: string;
+  errOfflineBar: string;
+  errQuota: string;
+  errInvalid: string;
+  errGeneric: string;
+  loadOlderMessages: string;
+  reportAction: string;
+  reportMessageTitle: string;
+  reportUserTitle: string;
+  reportReasonLabel: string;
+  reasonSpam: string;
+  reasonAbuse: string;
+  reasonInappropriate: string;
+  reasonOther: string;
+  reportNotePlaceholder: string;
+  alsoBlockLabel: string;
+  reportSubmit: string;
+  reportSentToast: string;
+  blockAction: string;
+  unblockAction: string;
+  blockConfirmTitle: string;
+  blockConfirmText: string;
+  blockedToast: string;
+  unblockedToast: string;
+  blockedListTitle: string;
+  blockedListEmpty: string;
+  reportsTitle: string;
+  reportsEmpty: string;
+  deleteMessageAction: string;
+  markResolved: string;
+  dismissReport: string;
+  messageDeletedToast: string;
   settingsSavedOnDevice: string;
   settingsAppearance: string;
   themeSystem: string;
@@ -332,6 +365,39 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     noDirectChatsYet: 'ابحث عن شخص باسم المستخدم وابعتله طلب محادثة.',
     groupChatBadge: 'دردشة جماعية',
     privateChatBadge: 'دردشة خاصة',
+    errPermission: 'ما عندك صلاحية تعمل هالشي.',
+    errOffline: 'في مشكلة بالاتصال، عم نحاول مرة ثانية…',
+    errOfflineBar: 'أنت غير متصل بالإنترنت. رح نكمّل أول ما يرجع الاتصال.',
+    errQuota: 'الموقع عليه ضغط هلأ، جرّب كمان شوي.',
+    errInvalid: 'في إشي مش صحيح بالبيانات، جرّب مرة ثانية.',
+    errGeneric: 'صار خطأ، جرّب مرة ثانية.',
+    loadOlderMessages: 'عرض الرسائل الأقدم',
+    reportAction: 'إبلاغ',
+    reportMessageTitle: 'الإبلاغ عن رسالة',
+    reportUserTitle: 'الإبلاغ عن شخص',
+    reportReasonLabel: 'شو المشكلة؟',
+    reasonSpam: 'إزعاج أو رسائل مكررة',
+    reasonAbuse: 'إساءة أو تنمّر',
+    reasonInappropriate: 'محتوى غير لائق',
+    reasonOther: 'سبب ثاني',
+    reportNotePlaceholder: 'تفاصيل إضافية (اختياري)',
+    alsoBlockLabel: 'واحظر هالشخص كمان',
+    reportSubmit: 'إرسال البلاغ',
+    reportSentToast: 'وصل البلاغ للإدارة، شكراً إلك.',
+    blockAction: 'حظر',
+    unblockAction: 'إلغاء الحظر',
+    blockConfirmTitle: 'حظر هالشخص؟',
+    blockConfirmText: 'ما رح يقدر يبعتلك طلبات أو رسائل خاصة، ورسائله بالغرف رح تختفي عندك. بتقدر تلغي الحظر من الإعدادات.',
+    blockedToast: 'تم الحظر.',
+    unblockedToast: 'تم إلغاء الحظر.',
+    blockedListTitle: 'الأشخاص المحظورين',
+    blockedListEmpty: 'ما حظرت حدا.',
+    reportsTitle: 'البلاغات المفتوحة',
+    reportsEmpty: 'ما في بلاغات حالياً.',
+    deleteMessageAction: 'حذف الرسالة',
+    markResolved: 'تم الحل',
+    dismissReport: 'تجاهل',
+    messageDeletedToast: 'انحذفت الرسالة.',
     settingsSavedOnDevice: 'بتنحفظ على هالجهاز وبتقدر تغيّرها بأي وقت.',
     settingsAppearance: 'المظهر',
     themeSystem: 'حسب الجهاز',
@@ -536,6 +602,39 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     noDirectChatsYet: 'Find someone by username and send them a chat request.',
     groupChatBadge: 'Group Chat',
     privateChatBadge: 'Private Chat',
+    errPermission: 'You do not have permission to do that.',
+    errOffline: 'Connection problem, retrying…',
+    errOfflineBar: 'You are offline. We will continue once the connection is back.',
+    errQuota: 'The site is busy right now, try again shortly.',
+    errInvalid: 'Something in the data is not valid, please try again.',
+    errGeneric: 'Something went wrong, please try again.',
+    loadOlderMessages: 'Show older messages',
+    reportAction: 'Report',
+    reportMessageTitle: 'Report message',
+    reportUserTitle: 'Report person',
+    reportReasonLabel: 'What is the problem?',
+    reasonSpam: 'Spam or repeated messages',
+    reasonAbuse: 'Abuse or bullying',
+    reasonInappropriate: 'Inappropriate content',
+    reasonOther: 'Something else',
+    reportNotePlaceholder: 'Extra details (optional)',
+    alsoBlockLabel: 'Also block this person',
+    reportSubmit: 'Send report',
+    reportSentToast: 'Report sent to the admins, thank you.',
+    blockAction: 'Block',
+    unblockAction: 'Unblock',
+    blockConfirmTitle: 'Block this person?',
+    blockConfirmText: 'They will not be able to send you requests or private messages, and their room messages will be hidden for you. You can unblock from Settings.',
+    blockedToast: 'Blocked.',
+    unblockedToast: 'Unblocked.',
+    blockedListTitle: 'Blocked people',
+    blockedListEmpty: 'You have not blocked anyone.',
+    reportsTitle: 'Open reports',
+    reportsEmpty: 'No reports right now.',
+    deleteMessageAction: 'Delete message',
+    markResolved: 'Resolved',
+    dismissReport: 'Dismiss',
+    messageDeletedToast: 'Message deleted.',
     settingsSavedOnDevice: 'Saved on this device, change them anytime.',
     settingsAppearance: 'Appearance',
     themeSystem: 'System',

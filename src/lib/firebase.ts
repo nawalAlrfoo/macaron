@@ -3,6 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { doc, getDocFromServer, getFirestore } from 'firebase/firestore';
 import firebaseConfig from '@/firebase-applet-config.json';
+import { errorKeyFor, showToast } from './toast';
 
 export const ADMIN_BOOTSTRAP_EMAIL = 'nawalalrfoo@gmail.com';
 
@@ -59,11 +60,15 @@ export interface FirestoreErrorInfo {
   };
 }
 
+/**
+ * Logs a Firestore error with context and shows a friendly toast.
+ * It no longer throws: a failed listener or write must never break the whole page.
+ */
 export function handleFirestoreError(
   error: unknown,
   operationType: OperationType,
   path: string | null
-): never {
+): void {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -82,7 +87,7 @@ export function handleFirestoreError(
     path,
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  showToast({ kind: 'error', key: errorKeyFor(error) });
 }
 
 export async function testConnection(): Promise<void> {

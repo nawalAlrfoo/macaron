@@ -100,6 +100,12 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/nicknames/$(h)).data.uid == request.auth.uid;
     }
 
+    // true if `ownerUid` has blocked `otherUid`
+    function hasBlocked(ownerUid, otherUid) {
+      return exists(/databases/$(database)/documents/blocks/$(ownerUid))
+        && otherUid in get(/databases/$(database)/documents/blocks/$(ownerUid)).data.blocked;
+    }
+
     // --- Validation Blueprints ---
     function isValidUserPublicProfile(data, expectedUid) {
       return data.keys().hasAll(['uid', 'name', 'nickname', 'photoUrl', 'status', 'createdAt', 'updatedAt'])
@@ -435,7 +441,8 @@ service cloud.firestore {
       match /messages/{messageId} {
         allow get: if isValidRoomId(roomId) && isValidId(messageId) && isVerified()
           && exists(/databases/$(database)/documents/rooms/$(roomId));
-        allow list: if isVerified() && resource.data.roomId == roomId;
+        // any signed-in member may page through a room (ordered by createdAt, limited)
+        allow list: if isVerified() && request.query.limit <= 200;
 
         allow create: if isValidRoomId(roomId)
           && isValidId(messageId)
@@ -501,6 +508,8 @@ service cloud.firestore {
         && incoming().createdBy == request.auth.uid
         && incoming().status == 'pending'
         && incoming().requestedBy == request.auth.uid
+        && !hasBlocked(incoming().participantUids[0], request.auth.uid)
+        && !hasBlocked(incoming().participantUids[1], request.auth.uid)
         && incoming().requestMessageSent == false
         && incoming().createdAt == request.time
         && incoming().updatedAt == request.time;
@@ -554,7 +563,10 @@ service cloud.firestore {
           && exists(/databases/$(database)/documents/direct_chats/$(chatId))
           && request.auth.uid in get(/databases/$(database)/documents/direct_chats/$(chatId)).data.participantUids;
 
-        allow list: if isVerified() && request.auth.uid in resource.data.participantUids;
+        // only the two participants of the parent chat may read its messages
+        allow list: if isVerified()
+          && request.query.limit <= 200
+          && request.auth.uid in get(/databases/$(database)/documents/direct_chats/$(chatId)).data.participantUids;
 
         allow create: if isValidId(chatId)
           && isValidId(messageId)
@@ -566,6 +578,8 @@ service cloud.firestore {
           && exists(/databases/$(database)/documents/direct_chats/$(chatId))
           && request.auth.uid in get(/databases/$(database)/documents/direct_chats/$(chatId)).data.participantUids
           && incoming().participantUids == get(/databases/$(database)/documents/direct_chats/$(chatId)).data.participantUids
+          && !hasBlocked(get(/databases/$(database)/documents/direct_chats/$(chatId)).data.participantUids[0], request.auth.uid)
+          && !hasBlocked(get(/databases/$(database)/documents/direct_chats/$(chatId)).data.participantUids[1], request.auth.uid)
           && (
             get(/databases/$(database)/documents/direct_chats/$(chatId)).data.get('status', 'accepted') == 'accepted'
             || (
@@ -629,6 +643,53 @@ service cloud.firestore {
         && isOwner(userId)
         && isValidReadState(incoming(), userId);
       allow delete: if isValidId(userId) && isOwner(userId);
+    }
+
+    // 10. Block list: /blocks/{uid} { uid, blocked: [uids], updatedAt } — owner only.
+    // Other rules read it (hasBlocked) to stop requests/messages from blocked people.
+    match /blocks/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if false;
+      allow create, update: if isValidId(userId)
+        && isOwner(userId)
+        && incoming().keys().hasAll(['uid', 'blocked', 'updatedAt'])
+        && incoming().keys().hasOnly(['uid', 'blocked', 'updatedAt'])
+        && incoming().uid == userId
+        && incoming().blocked is list
+        && incoming().blocked.size() <= 500
+        && !(userId in incoming().blocked)
+        && incoming().updatedAt == request.time;
+      allow delete: if isValidId(userId) && isOwner(userId);
+    }
+
+    // 11. Reports: any member can report a person/message; only admins read and handle them
+    match /reports/{reportId} {
+      allow get, list: if isAdmin();
+      allow create: if isVerified()
+        && isValidId(reportId)
+        && incoming().keys().hasAll(['id', 'reporterUid', 'targetUid', 'reason', 'status', 'createdAt'])
+        && incoming().keys().hasOnly([
+          'id', 'reporterUid', 'targetUid', 'targetName', 'targetNickname', 'reason', 'note',
+          'roomId', 'chatId', 'messageId', 'messageText', 'status', 'createdAt'
+        ])
+        && incoming().id == reportId
+        && incoming().reporterUid == request.auth.uid
+        && isValidId(incoming().targetUid)
+        && incoming().targetUid != request.auth.uid
+        && incoming().reason in ['spam', 'abuse', 'inappropriate', 'other']
+        && (!('note' in incoming()) || (incoming().note is string && incoming().note.size() <= 300))
+        && (!('targetName' in incoming()) || (incoming().targetName is string && incoming().targetName.size() <= 60))
+        && (!('targetNickname' in incoming()) || (incoming().targetNickname is string && incoming().targetNickname.size() <= 40))
+        && (!('roomId' in incoming()) || isValidRoomId(incoming().roomId))
+        && (!('chatId' in incoming()) || isValidId(incoming().chatId))
+        && (!('messageId' in incoming()) || isValidId(incoming().messageId))
+        && (!('messageText' in incoming()) || (incoming().messageText is string && incoming().messageText.size() <= 300))
+        && incoming().status == 'open'
+        && incoming().createdAt == request.time;
+      allow update: if isAdmin()
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status'])
+        && incoming().status in ['open', 'resolved', 'dismissed'];
+      allow delete: if isAdmin();
     }
   }
 }

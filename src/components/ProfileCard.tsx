@@ -65,7 +65,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ target, language, onCl
         role="dialog"
         aria-label={name}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full sm:max-w-xs sheet-in rounded-t-3xl sm:rounded-2xl border border-slate-200 dark:border-[#262A36] bg-white dark:bg-[#171A23] shadow-xl px-6 pt-7 pb-safe sm:pb-6 text-center"
+        className="relative w-full sm:max-w-xs sheet-in rounded-t-3xl sm:rounded-2xl border border-slate-200 dark:border-[#26272F] bg-white dark:bg-[#16171C] shadow-xl px-6 pt-7 pb-safe sm:pb-6 text-center"
       >
         <button
           type="button"
@@ -79,7 +79,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ target, language, onCl
         <div className="relative inline-block">
           <AvatarImg src={profile?.photoUrl || target.photoUrl} name={name} sizeClass="w-20 h-20" className="mx-auto ring-4 ring-violet-100 dark:ring-violet-500/20" />
           {profile?.status === 'online' && (
-            <span className="absolute bottom-1 end-1 w-4 h-4 rounded-full bg-emerald-400 border-2 border-white dark:border-[#171A23]" />
+            <span className="absolute bottom-1 end-1 w-4 h-4 rounded-full bg-emerald-400 border-2 border-white dark:border-[#16171C]" />
           )}
         </div>
         <h2 className="mt-3 text-lg font-bold text-slate-900 dark:text-slate-50">{name}</h2>
@@ -116,7 +116,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ target, language, onCl
               onClick={onReport}
               title={t.reportAction}
               aria-label={t.reportAction}
-              className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-[#262A36] text-slate-400 hover:text-rose-500 cursor-pointer"
+              className="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-[#26272F] text-slate-400 hover:text-rose-500 cursor-pointer"
             >
               <Flag className="w-4 h-4" />
             </button>

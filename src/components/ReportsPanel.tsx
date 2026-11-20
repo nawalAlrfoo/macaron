@@ -72,7 +72,7 @@ export const ReportsPanel: React.FC<{ language: Language }> = ({ language }) => 
   };
 
   return (
-    <section className="rounded-2xl border border-slate-200 dark:border-[#262A36] bg-white dark:bg-[#171A23] p-6 space-y-4">
+    <section className="rounded-2xl border border-slate-200 dark:border-[#26272F] bg-white dark:bg-[#16171C] p-6 space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-50">
           <Flag className="w-4 h-4 text-rose-500" />
@@ -88,7 +88,7 @@ export const ReportsPanel: React.FC<{ language: Language }> = ({ language }) => 
       ) : (
         <ul className="space-y-3">
           {reports.map((r) => (
-            <li key={r.id} className="rounded-xl border border-slate-200 dark:border-[#262A36] p-4 space-y-2.5">
+            <li key={r.id} className="rounded-xl border border-slate-200 dark:border-[#26272F] p-4 space-y-2.5">
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="font-semibold text-slate-900 dark:text-slate-100">{r.targetName ?? r.targetUid}</span>
                 {r.targetNickname && (
@@ -103,7 +103,7 @@ export const ReportsPanel: React.FC<{ language: Language }> = ({ language }) => 
                 </span>
               </div>
               {r.messageText && (
-                <blockquote className="px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#11131A] border-s-2 border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300">
+                <blockquote className="px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#0F1014] border-s-2 border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300">
                   {r.messageText}
                 </blockquote>
               )}
@@ -124,7 +124,7 @@ export const ReportsPanel: React.FC<{ language: Language }> = ({ language }) => 
                   type="button"
                   disabled={busyId === r.id}
                   onClick={() => setStatus(r, 'resolved')}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-[#262A36] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1E2230] disabled:opacity-60 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-[#26272F] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1F2027] disabled:opacity-60 cursor-pointer"
                 >
                   <Check className="w-3.5 h-3.5" />
                   {t.markResolved}
@@ -133,7 +133,7 @@ export const ReportsPanel: React.FC<{ language: Language }> = ({ language }) => 
                   type="button"
                   disabled={busyId === r.id}
                   onClick={() => setStatus(r, 'dismissed')}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-50 dark:hover:bg-[#1E2230] disabled:opacity-60 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-50 dark:hover:bg-[#1F2027] disabled:opacity-60 cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
                   {t.dismissReport}

@@ -65,7 +65,7 @@ export const ReportDialog: React.FC<ReportDialogProps> = ({ language, myUid, tar
       <form
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
-        className="w-full sm:max-w-md max-h-[92dvh] overflow-y-auto overscroll-contain sheet-in rounded-t-3xl sm:rounded-2xl border border-slate-200 dark:border-[#262A36] bg-white dark:bg-[#171A23] shadow-xl p-5 pb-safe sm:p-6 space-y-4"
+        className="w-full sm:max-w-md max-h-[92dvh] overflow-y-auto overscroll-contain sheet-in rounded-t-3xl sm:rounded-2xl border border-slate-200 dark:border-[#26272F] bg-white dark:bg-[#16171C] shadow-xl p-5 pb-safe sm:p-6 space-y-4"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -83,7 +83,7 @@ export const ReportDialog: React.FC<ReportDialogProps> = ({ language, myUid, tar
         </div>
 
         {target.messageText && (
-          <blockquote className="px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#11131A] border-s-2 border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300 line-clamp-3">
+          <blockquote className="px-3 py-2 rounded-lg bg-slate-50 dark:bg-[#0F1014] border-s-2 border-slate-300 dark:border-slate-600 text-xs text-slate-600 dark:text-slate-300 line-clamp-3">
             {target.messageText}
           </blockquote>
         )}
@@ -96,7 +96,7 @@ export const ReportDialog: React.FC<ReportDialogProps> = ({ language, myUid, tar
               className={`flex items-center gap-2.5 px-3 py-2 rounded-lg border text-sm cursor-pointer transition-colors ${
                 reason === r.value
                   ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-slate-900 dark:text-slate-50'
-                  : 'border-slate-200 dark:border-[#262A36] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1E2230]'
+                  : 'border-slate-200 dark:border-[#26272F] text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#1F2027]'
               }`}
             >
               <input
@@ -118,7 +118,7 @@ export const ReportDialog: React.FC<ReportDialogProps> = ({ language, myUid, tar
           maxLength={300}
           rows={2}
           placeholder={t.reportNotePlaceholder}
-          className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 dark:border-[#262A36] bg-white dark:bg-[#11131A] text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-violet-200/60 dark:focus:ring-violet-500/20 resize-none"
+          className="w-full px-3 py-2 rounded-lg text-sm border border-slate-200 dark:border-[#26272F] bg-white dark:bg-[#0F1014] text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-violet-200/60 dark:focus:ring-violet-500/20 resize-none"
         />
 
         <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">

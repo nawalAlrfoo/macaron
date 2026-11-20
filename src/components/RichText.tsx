@@ -78,7 +78,7 @@ function renderInline(text: string, keyBase: string, isMine: boolean) {
           key={`${keyBase}-c${i++}`}
           dir="ltr"
           className={`px-1.5 py-0.5 rounded-md font-mono text-[0.85em] ${
-            isMine ? 'bg-white/20' : 'bg-slate-100 dark:bg-[#11131A] text-rose-600 dark:text-rose-300'
+            isMine ? 'bg-white/20' : 'bg-slate-100 dark:bg-[#0F1014] text-rose-600 dark:text-rose-300'
           }`}
         >
           {tok.slice(1, -1)}
@@ -101,7 +101,7 @@ const CodeBlock: React.FC<{ code: string; lang: string; copyLabel: string; copie
 }) => {
   const [copied, setCopied] = useState(false);
   return (
-    <div className="my-1.5 rounded-lg overflow-hidden border border-black/10 dark:border-white/10 bg-[#0F1117] text-slate-100" dir="ltr" onClick={(e) => e.stopPropagation()}>
+    <div className="my-1.5 rounded-lg overflow-hidden border border-black/10 dark:border-white/10 bg-[#0B0B0E] text-slate-100" dir="ltr" onClick={(e) => e.stopPropagation()}>
       <div className="flex items-center justify-between px-3 py-1 text-[10px] uppercase tracking-wide text-slate-400 bg-white/5">
         <span>{lang || 'code'}</span>
         <button

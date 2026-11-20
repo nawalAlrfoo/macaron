@@ -167,7 +167,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
                 maxLength={VALIDATION_LIMITS.MAX_NAME_LEN}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-2xl text-sm border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-[#11131A] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-violet-200/60 dark:focus:ring-violet-500/20 transition-shadow"
+                className="w-full px-3.5 py-2 rounded-2xl text-sm border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-[#0F1014] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-violet-200/60 dark:focus:ring-violet-500/20 transition-shadow"
               />
             </div>
 
@@ -186,7 +186,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
                   maxLength={20}
                   value={nickname}
                   onChange={(e) => setNickname(normalizeNickname(e.target.value))}
-                  className="w-full ps-8 pe-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#11131A] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-violet-200/60 dark:focus:ring-violet-500/20 focus:border-violet-400 transition-shadow"
+                  className="w-full ps-8 pe-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0F1014] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-violet-200/60 dark:focus:ring-violet-500/20 focus:border-violet-400 transition-shadow"
                 />
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.nicknameHint}</p>
@@ -204,7 +204,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               maxLength={VALIDATION_LIMITS.MAX_EMAIL_LEN}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3.5 py-2 rounded-2xl text-sm border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-[#11131A] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-violet-200/60 dark:focus:ring-violet-500/20 transition-shadow"
+              className="w-full px-3.5 py-2 rounded-2xl text-sm border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-[#0F1014] text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-4 focus:ring-violet-200/60 dark:focus:ring-violet-500/20 transition-shadow"
             />
           </div>
 

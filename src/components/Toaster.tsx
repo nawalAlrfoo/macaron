@@ -45,7 +45,7 @@ export const Toaster: React.FC = () => {
           <div
             key={toast.id}
             role={toast.kind === 'error' ? 'alert' : 'status'}
-            className="pointer-events-auto msg-in w-full max-w-sm flex items-start gap-2.5 px-4 py-3 rounded-xl border border-slate-200 dark:border-[#262A36] bg-white dark:bg-[#171A23] text-sm text-slate-700 dark:text-slate-200 shadow-lg"
+            className="pointer-events-auto msg-in w-full max-w-sm flex items-start gap-2.5 px-4 py-3 rounded-xl border border-slate-200 dark:border-[#26272F] bg-white dark:bg-[#16171C] text-sm text-slate-700 dark:text-slate-200 shadow-lg"
           >
             <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${color}`} />
             <span className="flex-1 leading-relaxed">{toast.text ?? (toast.key ? t[toast.key] ?? toast.key : '')}</span>

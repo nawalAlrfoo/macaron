@@ -240,7 +240,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <button
             type="button"
             onClick={() => onPreviewLanguage(isRtl ? 'en' : 'ar')}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#171A23] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#23273D] cursor-pointer whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#16171C] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#23273D] cursor-pointer whitespace-nowrap shrink-0"
           >
             <Globe className="w-3.5 h-3.5" />
             <span>{isRtl ? t.englishLang : t.arabicLang}</span>
@@ -248,7 +248,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <button
             type="button"
             onClick={() => onPreviewThemeMode(themeMode === 'light' ? 'dark' : 'light')}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#171A23] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#23273D] cursor-pointer whitespace-nowrap shrink-0"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#16171C] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#23273D] cursor-pointer whitespace-nowrap shrink-0"
           >
             {themeMode === 'light' ? (
               <>
@@ -305,7 +305,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   value={draft.siteNameAr}
                   onChange={(e) => setDraft({ ...draft, siteNameAr: e.target.value })}
                   dir="rtl"
-                  className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-[#11131A] text-slate-900 dark:text-slate-100"
+                  className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-[#0F1014] text-slate-900 dark:text-slate-100"
                 />
               </div>
 
@@ -320,7 +320,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   value={draft.siteNameEn}
                   onChange={(e) => setDraft({ ...draft, siteNameEn: e.target.value })}
                   dir="ltr"
-                  className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-[#11131A] text-slate-900 dark:text-slate-100"
+                  className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-[#0F1014] text-slate-900 dark:text-slate-100"
                 />
               </div>
 
@@ -328,7 +328,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                   {t.globalThemeModeLabel}
                 </label>
-                <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-[#11131A]">
+                <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-[#0F1014]">
                   <button
                     type="button"
                     onClick={() => {
@@ -352,7 +352,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     }}
                     className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold cursor-pointer ${
                       draft.themeMode === 'dark'
-                        ? 'bg-[#262A36] text-white shadow-xs'
+                        ? 'bg-[#26272F] text-white shadow-xs'
                         : 'text-slate-600 dark:text-slate-400'
                     }`}
                   >
@@ -366,7 +366,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                   {t.defaultLanguageLabel}
                 </label>
-                <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-[#11131A]">
+                <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-[#0F1014]">
                   <button
                     type="button"
                     onClick={() => {
@@ -375,7 +375,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     }}
                     className={`py-2 rounded-lg text-xs font-semibold cursor-pointer ${
                       draft.defaultLanguage === 'ar'
-                        ? 'bg-white dark:bg-[#262A36] text-slate-900 dark:text-white shadow-xs'
+                        ? 'bg-white dark:bg-[#26272F] text-slate-900 dark:text-white shadow-xs'
                         : 'text-slate-600 dark:text-slate-400'
                     }`}
                   >
@@ -389,7 +389,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     }}
                     className={`py-2 rounded-lg text-xs font-semibold cursor-pointer ${
                       draft.defaultLanguage === 'en'
-                        ? 'bg-white dark:bg-[#262A36] text-slate-900 dark:text-white shadow-xs'
+                        ? 'bg-white dark:bg-[#26272F] text-slate-900 dark:text-white shadow-xs'
                         : 'text-slate-600 dark:text-slate-400'
                     }`}
                   >
@@ -456,7 +456,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 {colorPickers.map((item) => (
                   <label
                     key={item.key}
-                    className="flex items-center justify-between gap-2.5 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-[#11131A] cursor-pointer"
+                    className="flex items-center justify-between gap-2.5 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-[#0F1014] cursor-pointer"
                   >
                     <div className="min-w-0">
                       <div className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate">
@@ -494,7 +494,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   onChange={(e) =>
                     setDraft({ ...draft, chatBgStyle: e.target.value as ChatBgStyle })
                   }
-                  className="w-full px-3.5 py-2.5 rounded-xl text-xs font-medium border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#11131A] text-slate-800 dark:text-slate-100"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-xs font-medium border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#0F1014] text-slate-800 dark:text-slate-100"
                 >
                   {(Object.keys(t.bgStyles) as ChatBgStyle[]).map((k) => (
                     <option key={k} value={k}>
@@ -513,7 +513,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   onChange={(e) =>
                     setDraft({ ...draft, bubbleStyle: e.target.value as BubbleStyle })
                   }
-                  className="w-full px-3.5 py-2.5 rounded-xl text-xs font-medium border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#11131A] text-slate-800 dark:text-slate-100"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-xs font-medium border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#0F1014] text-slate-800 dark:text-slate-100"
                 >
                   {(Object.keys(t.bubbleStyles) as BubbleStyle[]).map((k) => (
                     <option key={k} value={k}>
@@ -576,7 +576,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
               {/* Sample Input Bar */}
               <div className="flex items-center gap-2 pt-3 border-t border-black/5 dark:border-white/10">
-                <div className="flex-1 px-3.5 py-2 rounded-xl bg-white/85 dark:bg-[#11131A]/90 border border-slate-200/80 dark:border-slate-700 text-xs text-slate-400">
+                <div className="flex-1 px-3.5 py-2 rounded-xl bg-white/85 dark:bg-[#0F1014]/90 border border-slate-200/80 dark:border-slate-700 text-xs text-slate-400">
                   {t.typeMessagePlaceholder}
                 </div>
                 <span
@@ -620,7 +620,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             onChange={(e) => setRoomNameAr(e.target.value)}
             placeholder={t.newRoomNameAr}
             dir="rtl"
-            className="px-3.5 py-2.5 rounded-xl text-xs border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#11131A] text-slate-900 dark:text-slate-100"
+            className="px-3.5 py-2.5 rounded-xl text-xs border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#0F1014] text-slate-900 dark:text-slate-100"
           />
           <input
             type="text"
@@ -630,7 +630,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             onChange={(e) => setRoomNameEn(e.target.value)}
             placeholder={t.newRoomNameEn}
             dir="ltr"
-            className="px-3.5 py-2.5 rounded-xl text-xs border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#11131A] text-slate-900 dark:text-slate-100"
+            className="px-3.5 py-2.5 rounded-xl text-xs border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#0F1014] text-slate-900 dark:text-slate-100"
           />
           <input
             type="text"
@@ -639,12 +639,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             onChange={(e) => setRoomDescAr(e.target.value)}
             placeholder={t.newRoomDescAr}
             dir="rtl"
-            className="px-3.5 py-2.5 rounded-xl text-xs border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#11131A] text-slate-900 dark:text-slate-100"
+            className="px-3.5 py-2.5 rounded-xl text-xs border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#0F1014] text-slate-900 dark:text-slate-100"
           />
           <select
             value={roomTone}
             onChange={(e) => setRoomTone(e.target.value as AccentTone)}
-            className="px-3.5 py-2.5 rounded-xl text-xs border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#11131A] text-slate-900 dark:text-slate-100"
+            className="px-3.5 py-2.5 rounded-xl text-xs border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#0F1014] text-slate-900 dark:text-slate-100"
           >
             <option value="yellow">{t.toneYellow}</option>
             <option value="pink">{t.tonePink}</option>
@@ -725,7 +725,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             value={memberSearch}
             onChange={(e) => setMemberSearch(e.target.value)}
             placeholder={t.searchMembersPlaceholder}
-            className="px-3.5 py-2 rounded-xl text-xs border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#11131A] text-slate-900 dark:text-slate-100 w-60"
+            className="px-3.5 py-2 rounded-xl text-xs border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#0F1014] text-slate-900 dark:text-slate-100 w-60"
           />
         </div>
 

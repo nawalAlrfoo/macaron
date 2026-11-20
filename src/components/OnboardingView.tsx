@@ -194,7 +194,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
           <button
             type="button"
             onClick={() => onToggleLanguage(isRtl ? 'en' : 'ar')}
-            className="glass inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full text-xs font-bold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-[#262A36] shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="glass inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full text-xs font-bold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-[#26272F] shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             <Globe className="w-3.5 h-3.5" />
             <span>{isRtl ? 'EN' : 'عربي'}</span>
@@ -203,7 +203,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
           <button
             type="button"
             onClick={() => onToggleThemeMode(themeMode === 'light' ? 'dark' : 'light')}
-            className="glass inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-[#262A36] shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="glass inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-[#26272F] shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             {themeMode === 'light' ? (
               <>
@@ -242,7 +242,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
             </div>
 
             {/* Calm preview of a solved question (replaces the old pastel banner image) */}
-            <div className="mt-6 rounded-3xl border border-slate-200 dark:border-[#262A36] bg-white/80 dark:bg-[#171A23] shadow-sm p-4 sm:p-5 space-y-3" aria-hidden="true">
+            <div className="mt-6 rounded-3xl border border-slate-200 dark:border-[#26272F] bg-white/80 dark:bg-[#16171C] shadow-sm p-4 sm:p-5 space-y-3" aria-hidden="true">
               <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
                 <MacaronLogo size={22} />
                 <span>{t.previewRoomName}</span>
@@ -251,7 +251,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                 </span>
               </div>
               <div className="flex">
-                <div className="max-w-[85%] rounded-2xl rounded-ss-md bg-slate-100 dark:bg-[#1E2230] px-3.5 py-2.5 text-sm text-slate-700 dark:text-slate-200">
+                <div className="max-w-[85%] rounded-2xl rounded-ss-md bg-slate-100 dark:bg-[#1F2027] px-3.5 py-2.5 text-sm text-slate-700 dark:text-slate-200">
                   {t.previewQuestion}
                 </div>
               </div>
@@ -390,7 +390,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                             onClick={() => setPhotoUrl(av.url)}
                             title={isRtl ? av.labelAr : av.labelEn}
                             className={`relative rounded-full p-0.5 transition-transform hover:scale-105 cursor-pointer ${
-                              selected ? 'ring-2 ring-offset-2 ring-violet-400 dark:ring-offset-[#171A23]' : ''
+                              selected ? 'ring-2 ring-offset-2 ring-violet-400 dark:ring-offset-[#16171C]' : ''
                             }`}
                           >
                             <AvatarImg src={av.url} name={av.labelEn} sizeClass="w-10 h-10" />
@@ -423,7 +423,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder={t.namePlaceholder}
-                      className="w-full px-4 py-2.5 rounded-2xl text-sm border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-[#11131A] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 transition-shadow focus:outline-none focus:ring-4 focus:ring-violet-200/70 dark:focus:ring-violet-500/25"
+                      className="w-full px-4 py-2.5 rounded-2xl text-sm border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-[#0F1014] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 transition-shadow focus:outline-none focus:ring-4 focus:ring-violet-200/70 dark:focus:ring-violet-500/25"
                     />
                   </div>
 
@@ -448,7 +448,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                         value={nickname}
                         onChange={(e) => setNickname(normalizeNickname(e.target.value))}
                         placeholder="nawal_99"
-                        className="w-full ps-8 pe-4 py-2.5 rounded-xl text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#11131A] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-violet-200/70 dark:focus:ring-violet-500/25 focus:border-violet-400 transition-shadow"
+                        className="w-full ps-8 pe-4 py-2.5 rounded-xl text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0F1014] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-violet-200/70 dark:focus:ring-violet-500/25 focus:border-violet-400 transition-shadow"
                       />
                     </div>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">{t.nicknameHint}</p>
@@ -472,7 +472,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder={t.emailPlaceholder}
                     dir="ltr"
-                    className="w-full px-4 py-2.5 rounded-2xl text-sm border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-[#11131A] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 transition-shadow focus:outline-none focus:ring-4 focus:ring-violet-200/70 dark:focus:ring-violet-500/25"
+                    className="w-full px-4 py-2.5 rounded-2xl text-sm border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-[#0F1014] text-slate-900 dark:text-slate-100 placeholder:text-slate-400 transition-shadow focus:outline-none focus:ring-4 focus:ring-violet-200/70 dark:focus:ring-violet-500/25"
                   />
                 </div>
 

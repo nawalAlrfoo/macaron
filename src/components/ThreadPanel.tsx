@@ -167,7 +167,7 @@ export const ThreadPanel: React.FC<ThreadPanelProps> = ({
     return (
       <div
         className={`rounded-2xl px-3.5 py-2.5 text-[0.9rem] leading-relaxed space-y-2 ${
-          best ? 'border-2 border-amber-300 dark:border-amber-500/60' : mine ? 'border border-transparent' : 'border border-slate-200 dark:border-[#262A36]'
+          best ? 'border-2 border-amber-300 dark:border-amber-500/60' : mine ? 'border border-transparent' : 'border border-slate-200 dark:border-[#26272F]'
         } ${opts.big ? 'text-[0.95rem]' : ''}`}
         style={{ backgroundColor: mine ? myBg : otherBg, color: mine ? myText : otherText }}
       >
@@ -206,10 +206,10 @@ export const ThreadPanel: React.FC<ThreadPanelProps> = ({
     <aside
       role="dialog"
       aria-label={t.threadTitle}
-      className="absolute inset-0 sm:inset-y-0 sm:start-auto sm:end-0 sm:w-[26rem] z-40 flex flex-col bg-[var(--app-bg)] sm:border-s border-slate-200 dark:border-[#262A36] shadow-2xl panel-in"
+      className="absolute inset-0 sm:inset-y-0 sm:start-auto sm:end-0 sm:w-[26rem] z-40 flex flex-col bg-[var(--app-bg)] sm:border-s border-slate-200 dark:border-[#26272F] shadow-2xl panel-in"
     >
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 sm:px-4 py-3 border-b border-slate-200 dark:border-[#262A36] bg-white/80 dark:bg-[#171A23]/80 backdrop-blur">
+      <div className="flex items-center gap-2 px-3 sm:px-4 py-3 border-b border-slate-200 dark:border-[#26272F] bg-white/80 dark:bg-[#16171C]/80 backdrop-blur">
         <button
           type="button"
           onClick={onClose}
@@ -242,7 +242,7 @@ export const ThreadPanel: React.FC<ThreadPanelProps> = ({
 
       <div ref={listRef} className="flex-1 overflow-y-auto overscroll-contain pastel-scroll px-3 sm:px-4 py-4 space-y-4">
         {/* Question */}
-        <div className="pb-4 border-b border-dashed border-slate-200 dark:border-[#262A36]">
+        <div className="pb-4 border-b border-dashed border-slate-200 dark:border-[#26272F]">
           <div className="flex items-start gap-2.5">
             <AvatarImg src={photoFor(question.senderUid, question.senderPhoto)} name={question.senderName} sizeClass="w-9 h-9" />
             <div className="min-w-0 flex-1">
@@ -256,7 +256,7 @@ export const ThreadPanel: React.FC<ThreadPanelProps> = ({
                     className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border cursor-pointer ${
                       question.solved
                         ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300'
-                        : 'border-slate-200 dark:border-[#262A36] text-slate-600 dark:text-slate-300 hover:text-emerald-600'
+                        : 'border-slate-200 dark:border-[#26272F] text-slate-600 dark:text-slate-300 hover:text-emerald-600'
                     }`}
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
@@ -302,7 +302,7 @@ export const ThreadPanel: React.FC<ThreadPanelProps> = ({
                       className={`mt-1.5 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border cursor-pointer ${
                         best
                           ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300'
-                          : 'border-slate-200 dark:border-[#262A36] text-slate-500 dark:text-slate-400 hover:text-amber-600'
+                          : 'border-slate-200 dark:border-[#26272F] text-slate-500 dark:text-slate-400 hover:text-amber-600'
                       }`}
                     >
                       <Award className="w-3.5 h-3.5" />
@@ -317,8 +317,8 @@ export const ThreadPanel: React.FC<ThreadPanelProps> = ({
       </div>
 
       {/* Reply composer */}
-      <form onSubmit={send} className="px-3 sm:px-4 pt-2 pb-safe-sm sm:pb-3 border-t border-slate-200 dark:border-[#262A36] bg-white/80 dark:bg-[#171A23]/80 backdrop-blur">
-        <div className="flex items-end gap-2 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#11131A] focus-within:ring-4 focus-within:ring-violet-200/50 dark:focus-within:ring-violet-500/15">
+      <form onSubmit={send} className="px-3 sm:px-4 pt-2 pb-safe-sm sm:pb-3 border-t border-slate-200 dark:border-[#26272F] bg-white/80 dark:bg-[#16171C]/80 backdrop-blur">
+        <div className="flex items-end gap-2 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0F1014] focus-within:ring-4 focus-within:ring-violet-200/50 dark:focus-within:ring-violet-500/15">
           <textarea
             ref={inputRef}
             rows={1}

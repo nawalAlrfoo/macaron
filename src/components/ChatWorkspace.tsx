@@ -246,7 +246,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     return (
       <span
         title={status === 'online' ? t.onlineStatus : t.awayStatus}
-        className={`absolute -bottom-0.5 -end-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-[#171A23] ${
+        className={`absolute -bottom-0.5 -end-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-[#16171C] ${
           status === 'online' ? 'bg-emerald-400' : 'bg-slate-300 dark:bg-slate-600'
         }`}
       />
@@ -626,7 +626,11 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         />
       </div>
 
-      {searching && memberQuery.length >= 3 ? (
+      {/[^\x00-\x7F@\s]/.test(memberFilter) ? (
+        <p className="px-1 text-[13px] text-amber-700 dark:text-amber-300 leading-relaxed">{t.searchLatinOnly}</p>
+      ) : memberQuery && memberQuery === currentUserProfile.nickname ? (
+        <p className="px-1 text-[13px] text-slate-500 dark:text-slate-400">{t.searchIsYou}</p>
+      ) : searching && memberQuery.length >= 3 ? (
         <p className="px-1 text-xs text-slate-400">…</p>
       ) : memberQuery.length < 3 ? (
         <p className="px-1 text-[13px] text-slate-500 dark:text-slate-400 leading-relaxed">{t.searchPeopleHint}</p>
@@ -1038,7 +1042,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
       {confirmBlockUid && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-slate-900/40 backdrop-blur-sm" onClick={() => setConfirmBlockUid(null)}>
-          <div onClick={(e) => e.stopPropagation()} className="w-full sm:max-w-sm sheet-in rounded-t-3xl sm:rounded-2xl pb-safe sm:pb-6 border border-slate-200 dark:border-[#262A36] bg-white dark:bg-[#171A23] shadow-xl p-6 space-y-4">
+          <div onClick={(e) => e.stopPropagation()} className="w-full sm:max-w-sm sheet-in rounded-t-3xl sm:rounded-2xl pb-safe sm:pb-6 border border-slate-200 dark:border-[#26272F] bg-white dark:bg-[#16171C] shadow-xl p-6 space-y-4">
             <h2 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-50">
               <Ban className="w-4 h-4 text-rose-500" />
               {t.blockConfirmTitle}

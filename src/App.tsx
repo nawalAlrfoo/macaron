@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   getRedirectResult,
   onAuthStateChanged,
@@ -85,6 +85,29 @@ function MacaronApp() {
   const [systemDark, setSystemDark] = useState(
     () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches
   );
+  // Self-heal: accounts created before @nickname claiming have no /nicknames doc,
+  // so nobody (except admins) could find them in search. Claim it on the next visit.
+  const claimedHandleRef = useRef('');
+  useEffect(() => {
+    const uid = user?.uid;
+    const handle = publicProfile?.nickname ?? '';
+    if (!uid || !NICKNAME_REGEX.test(handle) || claimedHandleRef.current === handle) return;
+    claimedHandleRef.current = handle;
+    (async () => {
+      try {
+        const ref = doc(db, 'nicknames', handle);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) {
+          await setDoc(ref, { uid, createdAt: serverTimestamp() });
+        } else if (snap.data()?.uid !== uid) {
+          console.warn('Nickname already claimed by another account:', handle);
+        }
+      } catch (err) {
+        console.warn('Nickname self-heal skipped:', err);
+      }
+    })();
+  }, [user?.uid, publicProfile?.nickname]);
+
   useEffect(() => {
     const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
     if (!mq) return;

@@ -1470,7 +1470,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
                   type="button"
                   onClick={loadOlder}
                   disabled={loadingOlder}
-                  className="px-4 py-1.5 rounded-full text-[11px] font-medium border border-slate-200 dark:border-[#262A36] bg-white dark:bg-[#171A23] text-slate-500 dark:text-slate-400 hover:text-[var(--primary)] cursor-pointer disabled:opacity-60"
+                  className="px-4 py-1.5 rounded-full text-[11px] font-medium border border-slate-200 dark:border-[#26272F] bg-white dark:bg-[#16171C] text-slate-500 dark:text-slate-400 hover:text-[var(--primary)] cursor-pointer disabled:opacity-60"
                 >
                   {loadingOlder ? t.loadingMessages : t.loadOlderMessages}
                 </button>
@@ -1564,7 +1564,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
 
         {isPending && !canCompose ? (
           iRequested ? (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#171A23] text-xs text-slate-600 dark:text-slate-300">
+            <div className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#16171C] text-xs text-slate-600 dark:text-slate-300">
               <span aria-hidden="true">⏳</span>
               <span className="flex-1">{t.requestSentWaiting}</span>
               <button

@@ -59,6 +59,10 @@ import { getPrefs } from '@/src/lib/prefs';
 import { primeProfile, senderPhotoValue, useProfilePhotos } from '@/src/lib/profiles';
 import { showToast } from '@/src/lib/toast';
 import { VoiceNote } from './VoiceNote';
+import { renderRichText, setMentionSelf } from './RichText';
+import { markSent, repliesLabel, waitForSendSlot } from '@/src/lib/send';
+import { ThreadPanel } from './ThreadPanel';
+import { ProfileCard, type ProfileCardTarget } from './ProfileCard';
 import { ReportDialog, type ReportTarget } from './ReportDialog';
 import { AvatarImg } from './AvatarImg';
 import { MacaronLogo } from './MacaronLogo';
@@ -78,6 +82,8 @@ interface ChatRoomViewProps {
   onLeaveChat?: () => void;
   /** Messages from these people are hidden */
   blockedUids?: string[];
+  /** Open / request a private chat with someone (from their profile card) */
+  onMessageUser?: (profile: UserPublicProfile) => Promise<void> | void;
 }
 
 const QUICK_EMOJIS = ['✨', '💛', '🩷', '🩵', '🌸', '☁️', '☕', '😊', '🫶', '🌟'];
@@ -86,151 +92,10 @@ const NEAR_BOTTOM_PX = 140;
 const PAGE_SIZE = 40;
 const MAX_LOADED = 200; // keep in sync with request.query.limit in firestore.rules
 
-// http(s) links; trailing punctuation is left outside the link
-const URL_SPLIT_RE = /(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"])/g;
-
-// @handles (same shape as NICKNAME_REGEX), not inside e-mail addresses.
-// No regex lookbehind: it is a syntax error on iOS < 16.4 and would break the whole app.
-const MENTION_RE = /@[a-z0-9_.]{3,20}/gi;
-/** Set at the start of each ChatRoomView render so mentions of me stand out */
-let mentionSelf = '';
-
-function renderMentions(text: string, keyBase: string): React.ReactNode {
-  const out: React.ReactNode[] = [];
-  let last = 0;
-  let m: RegExpExecArray | null;
-  MENTION_RE.lastIndex = 0;
-  while ((m = MENTION_RE.exec(text))) {
-    const prev = m.index > 0 ? text[m.index - 1] : '';
-    if (prev && /[\w@.]/.test(prev)) continue;
-    const handle = m[0].replace(/\.+$/, '');
-    if (handle.length < 4) continue;
-    if (m.index > last) out.push(text.slice(last, m.index));
-    const isMe = mentionSelf && handle.slice(1).toLowerCase() === mentionSelf;
-    out.push(
-      <span
-        key={`${keyBase}m${m.index}`}
-        dir="ltr"
-        className={`font-semibold rounded px-0.5 ${isMe ? 'bg-amber-200/80 text-amber-900 dark:bg-amber-400/30 dark:text-amber-100' : 'bg-black/5 dark:bg-white/10'}`}
-      >
-        {handle}
-      </span>
-    );
-    last = m.index + handle.length;
-  }
-  if (!out.length) return text;
-  if (last < text.length) out.push(text.slice(last));
-  return out;
-}
-
-function renderLinkifiedText(text: string) {
-  const parts = text.split(URL_SPLIT_RE);
-  return parts.map((part, i) =>
-    i % 2 === 1 ? (
-      <a
-        key={i}
-        href={part}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="underline underline-offset-2 decoration-1 break-all hover:opacity-80"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {part}
-      </a>
-    ) : (
-      <React.Fragment key={i}>{renderMentions(part, `l${i}`)}</React.Fragment>
-    )
-  );
-}
-
-/** Inline formatting: `code`, **bold**, and links */
-function renderInline(text: string, keyBase: string, isMine: boolean) {
-  const out: React.ReactNode[] = [];
-  const re = /(`[^`\n]+`|\*\*[^*\n]+\*\*)/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  let i = 0;
-  while ((m = re.exec(text))) {
-    if (m.index > last) out.push(<React.Fragment key={`${keyBase}-t${i++}`}>{renderLinkifiedText(text.slice(last, m.index))}</React.Fragment>);
-    const tok = m[0];
-    if (tok.startsWith('`')) {
-      out.push(
-        <code
-          key={`${keyBase}-c${i++}`}
-          dir="ltr"
-          className={`px-1.5 py-0.5 rounded-md font-mono text-[0.85em] ${
-            isMine ? 'bg-white/20' : 'bg-slate-100 dark:bg-[#11131A] text-rose-600 dark:text-rose-300'
-          }`}
-        >
-          {tok.slice(1, -1)}
-        </code>
-      );
-    } else {
-      out.push(<strong key={`${keyBase}-b${i++}`}>{tok.slice(2, -2)}</strong>);
-    }
-    last = m.index + tok.length;
-  }
-  if (last < text.length) out.push(<React.Fragment key={`${keyBase}-t${i++}`}>{renderLinkifiedText(text.slice(last))}</React.Fragment>);
-  return out;
-}
-
-const CodeBlock: React.FC<{ code: string; lang: string; copyLabel: string; copiedLabel: string }> = ({
-  code,
-  lang,
-  copyLabel,
-  copiedLabel,
-}) => {
-  const [copied, setCopied] = useState(false);
-  return (
-    <div className="my-1.5 rounded-lg overflow-hidden border border-black/10 dark:border-white/10 bg-[#0F1117] text-slate-100" dir="ltr" onClick={(e) => e.stopPropagation()}>
-      <div className="flex items-center justify-between px-3 py-1 text-[10px] uppercase tracking-wide text-slate-400 bg-white/5">
-        <span>{lang || 'code'}</span>
-        <button
-          type="button"
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(code);
-              setCopied(true);
-              window.setTimeout(() => setCopied(false), 1200);
-            } catch {
-              // ignore
-            }
-          }}
-          className="normal-case text-[11px] text-slate-300 hover:text-white cursor-pointer"
-        >
-          {copied ? copiedLabel : copyLabel}
-        </button>
-      </div>
-      <pre className="px-3 py-2.5 overflow-x-auto text-[12.5px] leading-relaxed font-mono whitespace-pre">
-        <code>{code}</code>
-      </pre>
-    </div>
-  );
-};
-
-/** ```fenced code``` blocks + inline formatting */
-function renderRichText(text: string, isMine: boolean, copyLabel: string, copiedLabel: string) {
-  const parts = text.split(/```/);
-  // an unmatched fence is shown as plain text
-  if (parts.length % 2 === 0) return renderInline(text, 'p', isMine);
-  return parts.map((part, idx) => {
-    if (idx % 2 === 1) {
-      const nl = part.indexOf('\n');
-      const first = nl === -1 ? '' : part.slice(0, nl).trim();
-      const isLang = /^[a-zA-Z0-9+#.-]{1,15}$/.test(first);
-      const code = (isLang ? part.slice(nl + 1) : part).replace(/^\n+|\n+$/g, '');
-      return <CodeBlock key={`cb${idx}`} code={code} lang={isLang ? first : ''} copyLabel={copyLabel} copiedLabel={copiedLabel} />;
-    }
-    const trimmed = part.replace(/^\n+|\n+$/g, '');
-    return trimmed ? <span key={`s${idx}`}>{renderInline(trimmed, `s${idx}`, isMine)}</span> : null;
-  });
-}
-
 /** A room message that asks something and hasn't been answered/solved yet */
 function isOpenQuestion(m: ChatMessage) {
   return !m.replyToId && !m.solved && !m.acceptedAnswerId && /[?؟]/.test(m.text || '');
 }
-const SEND_GAP_MS = 1500;
 const QUEUE_AFTER_MS = 6000;
 
 function dayKeyOf(date: Date) {
@@ -255,6 +120,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
   onMarkRead,
   onLeaveChat,
   blockedUids,
+  onMessageUser,
 }) => {
   const t = TRANSLATIONS[language];
   const isRtl = language === 'ar';
@@ -322,7 +188,10 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
   const [reactPickerFor, setReactPickerFor] = useState<string | null>(null);
   const [actionsOpenFor, setActionsOpenFor] = useState<string | null>(null);
   const [onlyOpenQuestions, setOnlyOpenQuestions] = useState(false);
-  const lastSentAtRef = useRef(0);
+  // Thread (question + its answers) open in the side panel
+  const [threadQuestion, setThreadQuestion] = useState<ChatMessage | null>(null);
+  const [profileTarget, setProfileTarget] = useState<ProfileCardTarget | null>(null);
+  const closeProfile = useCallback(() => setProfileTarget(null), []);
   // Tap anywhere outside the open message closes its action bar / emoji picker (phones)
   useEffect(() => {
     const openId = actionsOpenFor ?? reactPickerFor;
@@ -563,6 +432,18 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length, loading]);
 
+  const closeThread = useCallback(() => setThreadQuestion(null), []);
+  const openProfileOf = (msg: ChatMessage) => {
+    if (msg.senderUid === myUid) return;
+    setActionsOpenFor(null);
+    setProfileTarget({
+      uid: msg.senderUid,
+      name: msg.senderName,
+      nickname: msg.senderNickname,
+      photoUrl: photoFor(msg.senderUid, msg.senderPhoto),
+    });
+  };
+
   const jumpToMessage = (msgId?: string) => {
     if (!msgId) return;
     const el = scrollRef.current?.querySelector<HTMLElement>(`[data-msg-id="${CSS.escape(msgId)}"]`);
@@ -721,8 +602,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
       setReplyTo(null);
 
       // Slow mode (also enforced by firestore.rules): one message per SEND_GAP_MS
-      const wait = lastSentAtRef.current + SEND_GAP_MS - Date.now();
-      if (wait > 0) await new Promise((r) => window.setTimeout(r, wait));
+      await waitForSendSlot();
 
       const rateRef = doc(db, 'rate_limits', myUid);
       if (mode === 'direct' && directChat) {
@@ -747,7 +627,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
           (err) => console.warn('lastMessageAt update skipped:', err?.message ?? err)
         );
       }
-      lastSentAtRef.current = Date.now();
+      markSent();
       markRead();
     } catch (err) {
       onSendFailed(err, draftBackup, voice, path);
@@ -959,6 +839,16 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const blockedSet = useMemo(() => new Set(blockedUids ?? []), [blockedUids]);
+  // How many loaded answers each message has (thread chips)
+  const replyCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const m of messages) {
+      if (m.replyToId && !blockedSet.has(m.senderUid)) counts[m.replyToId] = (counts[m.replyToId] ?? 0) + 1;
+    }
+    return counts;
+  }, [messages, blockedSet]);
+  // Switching rooms closes the thread
+  useEffect(() => setThreadQuestion(null), [targetId]);
   const msgById = useMemo(() => new Map(messages.map((m) => [m.id, m])), [messages]);
   const acceptedIds = useMemo(
     () => new Set(messages.map((m) => m.acceptedAnswerId).filter(Boolean) as string[]),
@@ -1007,7 +897,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     [messages, mode, blockedSet]
   );
 
-  mentionSelf = currentUserProfile.nickname?.toLowerCase() ?? '';
+  setMentionSelf(currentUserProfile.nickname ?? '');
   useEffect(() => {
     primeProfile(myUid, currentUserProfile.photoUrl, currentUserProfile.name);
   }, [myUid, currentUserProfile.photoUrl, currentUserProfile.name]);
@@ -1136,12 +1026,20 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         {isGrouped ? (
           <span className={`w-8 sm:w-9 shrink-0 ${isMine ? 'max-sm:hidden' : ''}`} aria-hidden="true" />
         ) : (
-          <AvatarImg
-            src={photoFor(msg.senderUid, msg.senderPhoto)}
-            name={msg.senderName}
-            sizeClass="w-8 h-8 sm:w-9 sm:h-9"
-            className={`shadow-sm ring-2 ring-white dark:ring-[#171A23] ${isMine ? 'max-sm:hidden' : ''}`}
-          />
+          <button
+            type="button"
+            disabled={isMine}
+            onClick={() => openProfileOf(msg)}
+            aria-label={msg.senderName}
+            className={`shrink-0 rounded-full ${isMine ? 'max-sm:hidden cursor-default' : 'cursor-pointer hover:opacity-90'}`}
+          >
+            <AvatarImg
+              src={photoFor(msg.senderUid, msg.senderPhoto)}
+              name={msg.senderName}
+              sizeClass="w-8 h-8 sm:w-9 sm:h-9"
+              className="shadow-sm ring-2 ring-white dark:ring-[#171A23]"
+            />
+          </button>
         )}
 
         <div className={`flex flex-col min-w-0 ${isMine ? 'max-w-[85%]' : 'max-w-[80%]'} sm:max-w-[65%] ${isMine ? 'items-end' : 'items-start'}`}>
@@ -1151,9 +1049,17 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
               isGrouped && !msg.solved && !isAccepted ? 'hidden' : ''
             }`}
           >
-            <span className="font-semibold text-slate-700 dark:text-slate-200">
-              {isMine ? t.youLabel : msg.senderName}
-            </span>
+            {isMine ? (
+              <span className="font-semibold text-slate-700 dark:text-slate-200">{t.youLabel}</span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openProfileOf(msg)}
+                className="font-semibold text-slate-700 dark:text-slate-200 hover:text-violet-600 dark:hover:text-violet-300 hover:underline cursor-pointer"
+              >
+                {msg.senderName}
+              </button>
+            )}
             <span aria-hidden="true" className="hidden sm:inline">·</span>
             <span dir="ltr" className="hidden sm:inline">@{msg.senderNickname}</span>
             <span aria-hidden="true">·</span>
@@ -1279,6 +1185,26 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
           </div>
 
           {renderReactions(msg, isMine)}
+          {mode === 'room' && !msg.replyToId && (replyCounts[msg.id] || isOpenQuestion(msg)) && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActionsOpenFor(null);
+                setThreadQuestion(msg);
+              }}
+              className={`mt-1 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border cursor-pointer transition-colors ${
+                threadQuestion?.id === msg.id
+                  ? 'bg-[var(--primary)] text-white border-transparent'
+                  : 'bg-white/80 dark:bg-[#1E2230] border-slate-200 dark:border-slate-700 text-violet-700 dark:text-violet-300 hover:border-violet-300'
+              }`}
+            >
+              <span aria-hidden="true">💬</span>
+              {replyCounts[msg.id]
+                ? repliesLabel(replyCounts[msg.id], isRtl ? 'ar' : 'en')
+                : t.threadAnswerCta}
+            </button>
+          )}
           {isGrouped && (
             <span className={`h-0 overflow-visible text-[10px] tabular-nums text-slate-400 transition-opacity px-1.5 ${actionsVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
               {formatTime(msg)}
@@ -1802,6 +1728,49 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         </>
         )}
       </div>
+
+      {threadQuestion && mode === 'room' && targetId && (
+        <ThreadPanel
+          roomId={targetId}
+          question={messages.find((m) => m.id === threadQuestion.id) ?? threadQuestion}
+          currentUserProfile={currentUserProfile}
+          language={language}
+          locale={locale}
+          accent={gradient}
+          myBg={myBg}
+          myText={myText}
+          otherBg={otherBg}
+          otherText={otherText}
+          blockedUids={blockedSet}
+          onClose={closeThread}
+          onToggleSolved={toggleSolved}
+          onPickBest={pickBestAnswer}
+          onJumpTo={(id) => {
+            setThreadQuestion(null);
+            window.setTimeout(() => jumpToMessage(id), 50);
+          }}
+        />
+      )}
+
+      {profileTarget && (
+        <ProfileCard
+          target={profileTarget}
+          language={language}
+          onClose={closeProfile}
+          onMessage={mode === 'room' ? onMessageUser : undefined}
+          onReport={() => {
+            const p = profileTarget;
+            setProfileTarget(null);
+            setReportTarget({
+              uid: p.uid,
+              name: p.name,
+              nickname: p.nickname,
+              roomId: mode === 'room' ? targetId : undefined,
+              chatId: mode === 'direct' ? targetId : undefined,
+            });
+          }}
+        />
+      )}
 
       {reportTarget && (
         <ReportDialog

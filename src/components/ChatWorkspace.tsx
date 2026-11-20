@@ -940,6 +940,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
             settings={settings}
             onMarkRead={handleMarkRead}
             blockedUids={blockedUids}
+            onMessageUser={handleOpenMemberChat}
           />
         ) : null}
       </div>

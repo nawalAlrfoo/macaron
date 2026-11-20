@@ -130,8 +130,24 @@
     to { transform: translateX(0); }
   }
 
+  /* Panel that opens from the end edge (thread view) */
+  .panel-in {
+    animation: panel-in 240ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+  @keyframes panel-in {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+  }
+  html[dir="rtl"] .panel-in {
+    animation-name: panel-in-rtl;
+  }
+  @keyframes panel-in-rtl {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .msg-in, .pop-in, .sheet-in, .drawer-in {
+    .msg-in, .pop-in, .sheet-in, .drawer-in, .panel-in {
       animation: none;
     }
   }

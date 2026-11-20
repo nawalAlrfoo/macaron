@@ -130,6 +130,15 @@ export interface Translations {
   bestAnswerBadge: string;
   previewRoomName: string;
   sendTooFast: string;
+  threadTitle: string;
+  memberSince: string;
+  profileUnavailable: string;
+  messageThisPerson: string;
+  threadAnswerCta: string;
+  threadEmpty: string;
+  threadNoRepliesShort: string;
+  threadReplyPlaceholder: string;
+  threadShowInChat: string;
   messageQueued: string;
   openQuestionsFilter: string;
   openQuestionsEmpty: string;
@@ -390,6 +399,15 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     solvedBadge: 'تم الحل',
     bestAnswerBadge: 'أفضل إجابة',
     previewRoomName: 'البرمجة والتطوير',
+    threadTitle: 'السؤال والإجابات',
+    memberSince: 'عضو من {date}',
+    profileUnavailable: 'هالحساب مش موجود هلا.',
+    messageThisPerson: 'راسله',
+    threadAnswerCta: 'جاوب',
+    threadEmpty: 'لسا ما حدا جاوب. كون أول واحد بيساعد!',
+    threadNoRepliesShort: 'بدون ردود لسا',
+    threadReplyPlaceholder: 'اكتب جوابك…',
+    threadShowInChat: 'وريني إياه بالمحادثة',
     messageQueued: 'النت ضعيف، رسالتك رح تنبعت لحالها لما يرجع الاتصال.',
     sendTooFast: 'ما انبعتت الرسالة، يا بتبعث بسرعة كثير يا ما عندك صلاحية هون. استنى ثانية وجرّب.',
     openQuestionsFilter: 'أسئلة بدون حل',
@@ -649,6 +667,15 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     solvedBadge: 'Solved',
     bestAnswerBadge: 'Best answer',
     previewRoomName: 'Programming & Dev',
+    threadTitle: 'Question & answers',
+    memberSince: 'Member since {date}',
+    profileUnavailable: 'This account is no longer available.',
+    messageThisPerson: 'Message',
+    threadAnswerCta: 'Answer',
+    threadEmpty: 'No answers yet. Be the first to help!',
+    threadNoRepliesShort: 'No replies yet',
+    threadReplyPlaceholder: 'Write your answer…',
+    threadShowInChat: 'Show in chat',
     messageQueued: 'Weak connection — your message will be sent automatically when you are back online.',
     sendTooFast: "Message not sent: you're sending too fast or don't have access here. Wait a second and try again.",
     openQuestionsFilter: 'Open questions',

@@ -129,6 +129,10 @@ export interface Translations {
   solvedBadge: string;
   bestAnswerBadge: string;
   previewRoomName: string;
+  sendTooFast: string;
+  messageQueued: string;
+  openQuestionsFilter: string;
+  openQuestionsEmpty: string;
   previewQuestion: string;
   previewAnswer: string;
   markSolved: string;
@@ -386,6 +390,10 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     solvedBadge: 'تم الحل',
     bestAnswerBadge: 'أفضل إجابة',
     previewRoomName: 'البرمجة والتطوير',
+    messageQueued: 'النت ضعيف، رسالتك رح تنبعت لحالها لما يرجع الاتصال.',
+    sendTooFast: 'ما انبعتت الرسالة، يا بتبعث بسرعة كثير يا ما عندك صلاحية هون. استنى ثانية وجرّب.',
+    openQuestionsFilter: 'أسئلة بدون حل',
+    openQuestionsEmpty: 'كل الأسئلة هون انحلّت 🎉',
     previewQuestion: 'ليش React بيعطيني تحذير لما أعرض قائمة؟ 🤔',
     previewAnswer: 'لازم تعطي كل عنصر بالقائمة',
     markSolved: 'تعليم السؤال: تم الحل',
@@ -641,6 +649,10 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     solvedBadge: 'Solved',
     bestAnswerBadge: 'Best answer',
     previewRoomName: 'Programming & Dev',
+    messageQueued: 'Weak connection — your message will be sent automatically when you are back online.',
+    sendTooFast: "Message not sent: you're sending too fast or don't have access here. Wait a second and try again.",
+    openQuestionsFilter: 'Open questions',
+    openQuestionsEmpty: 'Every question here is solved 🎉',
     previewQuestion: 'Why does React warn me when I render a list? 🤔',
     previewAnswer: 'Give every item in the list a unique',
     markSolved: 'Mark question as solved',

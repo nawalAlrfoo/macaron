@@ -56,6 +56,8 @@ import {
 } from '@/src/utils/colors';
 import { compressChatPhotoFile } from '@/src/utils/image';
 import { getPrefs } from '@/src/lib/prefs';
+import { primeProfile, senderPhotoValue, useProfilePhotos } from '@/src/lib/profiles';
+import { showToast } from '@/src/lib/toast';
 import { VoiceNote } from './VoiceNote';
 import { ReportDialog, type ReportTarget } from './ReportDialog';
 import { AvatarImg } from './AvatarImg';
@@ -87,6 +89,40 @@ const MAX_LOADED = 200; // keep in sync with request.query.limit in firestore.ru
 // http(s) links; trailing punctuation is left outside the link
 const URL_SPLIT_RE = /(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"])/g;
 
+// @handles (same shape as NICKNAME_REGEX), not inside e-mail addresses.
+// No regex lookbehind: it is a syntax error on iOS < 16.4 and would break the whole app.
+const MENTION_RE = /@[a-z0-9_.]{3,20}/gi;
+/** Set at the start of each ChatRoomView render so mentions of me stand out */
+let mentionSelf = '';
+
+function renderMentions(text: string, keyBase: string): React.ReactNode {
+  const out: React.ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  MENTION_RE.lastIndex = 0;
+  while ((m = MENTION_RE.exec(text))) {
+    const prev = m.index > 0 ? text[m.index - 1] : '';
+    if (prev && /[\w@.]/.test(prev)) continue;
+    const handle = m[0].replace(/\.+$/, '');
+    if (handle.length < 4) continue;
+    if (m.index > last) out.push(text.slice(last, m.index));
+    const isMe = mentionSelf && handle.slice(1).toLowerCase() === mentionSelf;
+    out.push(
+      <span
+        key={`${keyBase}m${m.index}`}
+        dir="ltr"
+        className={`font-semibold rounded px-0.5 ${isMe ? 'bg-amber-200/80 text-amber-900 dark:bg-amber-400/30 dark:text-amber-100' : 'bg-black/5 dark:bg-white/10'}`}
+      >
+        {handle}
+      </span>
+    );
+    last = m.index + handle.length;
+  }
+  if (!out.length) return text;
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
 function renderLinkifiedText(text: string) {
   const parts = text.split(URL_SPLIT_RE);
   return parts.map((part, i) =>
@@ -102,7 +138,7 @@ function renderLinkifiedText(text: string) {
         {part}
       </a>
     ) : (
-      <React.Fragment key={i}>{part}</React.Fragment>
+      <React.Fragment key={i}>{renderMentions(part, `l${i}`)}</React.Fragment>
     )
   );
 }
@@ -189,6 +225,13 @@ function renderRichText(text: string, isMine: boolean, copyLabel: string, copied
     return trimmed ? <span key={`s${idx}`}>{renderInline(trimmed, `s${idx}`, isMine)}</span> : null;
   });
 }
+
+/** A room message that asks something and hasn't been answered/solved yet */
+function isOpenQuestion(m: ChatMessage) {
+  return !m.replyToId && !m.solved && !m.acceptedAnswerId && /[?؟]/.test(m.text || '');
+}
+const SEND_GAP_MS = 1500;
+const QUEUE_AFTER_MS = 6000;
 
 function dayKeyOf(date: Date) {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
@@ -278,6 +321,8 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [reactPickerFor, setReactPickerFor] = useState<string | null>(null);
   const [actionsOpenFor, setActionsOpenFor] = useState<string | null>(null);
+  const [onlyOpenQuestions, setOnlyOpenQuestions] = useState(false);
+  const lastSentAtRef = useRef(0);
   // Tap anywhere outside the open message closes its action bar / emoji picker (phones)
   useEffect(() => {
     const openId = actionsOpenFor ?? reactPickerFor;
@@ -577,6 +622,41 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     else clearTyping(targetId);
   };
 
+  // Give the user their message back instead of losing it
+  const onSendFailed = (
+    err: unknown,
+    backup: { text: string; photo: string | null; replyTo: ChatMessage | null } | null,
+    voice: unknown,
+    path: string
+  ) => {
+    if (backup && !voice) {
+      setText((cur) => cur || backup.text);
+      setAttachedPhoto((cur) => cur ?? backup.photo);
+      setReplyTo((cur) => cur ?? backup.replyTo);
+    }
+    if ((err as { code?: string })?.code === 'permission-denied') {
+      showToast({ kind: 'error', key: 'sendTooFast' });
+    } else {
+      handleFirestoreError(err, OperationType.CREATE, path);
+    }
+  };
+
+  /** Offline: Firestore keeps the write queued; don't keep the composer locked meanwhile. */
+  const commitOrQueue = async (commit: Promise<void>, onLateError: (err: unknown) => void) => {
+    let timer = 0;
+    const result = await Promise.race([
+      commit.then(() => 'sent' as const),
+      new Promise<'queued'>((resolve) => {
+        timer = window.setTimeout(() => resolve('queued'), QUEUE_AFTER_MS);
+      }),
+    ]);
+    window.clearTimeout(timer);
+    if (result === 'queued') {
+      commit.catch(onLateError);
+      showToast({ kind: 'info', key: 'messageQueued' });
+    }
+  };
+
   const handleSend = async (e?: React.FormEvent, voice?: { url: string; duration: number }) => {
     e?.preventDefault();
     if (!targetId) return;
@@ -592,6 +672,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
 
     const msgId = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const path = `${baseCollection}/${targetId}/messages/${msgId}`;
+    let draftBackup: { text: string; photo: string | null; replyTo: ChatMessage | null } | null = null;
 
     try {
       const payload: Record<string, unknown> = {
@@ -599,7 +680,8 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         senderUid: myUid,
         senderName: currentUserProfile.name.slice(0, VALIDATION_LIMITS.MAX_NAME_LEN),
         senderNickname: currentUserProfile.nickname.slice(0, VALIDATION_LIMITS.MAX_NICKNAME_LEN),
-        senderPhoto: currentUserProfile.photoUrl.slice(0, VALIDATION_LIMITS.MAX_PHOTO_LEN),
+        // big data-URL avatars are loaded once per person instead of copied into every message
+        senderPhoto: senderPhotoValue(currentUserProfile.photoUrl).slice(0, VALIDATION_LIMITS.MAX_PHOTO_LEN),
         text: clean,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -631,33 +713,44 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
       }
 
       // Clear the composer right away so it feels instant
+      draftBackup = { text, photo: attachedPhoto, replyTo };
       if (!voice) {
         setText('');
         setAttachedPhoto(null);
       }
       setReplyTo(null);
 
+      // Slow mode (also enforced by firestore.rules): one message per SEND_GAP_MS
+      const wait = lastSentAtRef.current + SEND_GAP_MS - Date.now();
+      if (wait > 0) await new Promise((r) => window.setTimeout(r, wait));
+
+      const rateRef = doc(db, 'rate_limits', myUid);
       if (mode === 'direct' && directChat) {
         const batch = writeBatch(db);
         batch.set(doc(db, 'direct_chats', targetId, 'messages', msgId), payload);
+        batch.set(rateRef, { lastMessageAt: serverTimestamp() });
         batch.update(doc(db, 'direct_chats', targetId), {
           lastMessageText: (clean || (voice ? t.voiceMessage : t.photoSentPreview)).slice(0, 200),
           updatedAt: serverTimestamp(),
           // the single message allowed while the chat is still a request
           ...(isPending && iRequested ? { requestMessageSent: true } : {}),
         });
-        await batch.commit();
+        await commitOrQueue(batch.commit(), (err) => onSendFailed(err, draftBackup, voice, path));
       } else {
-        await setDoc(doc(db, 'rooms', targetId, 'messages', msgId), payload);
+        const batch = writeBatch(db);
+        batch.set(doc(db, 'rooms', targetId, 'messages', msgId), payload);
+        batch.set(rateRef, { lastMessageAt: serverTimestamp() });
+        await commitOrQueue(batch.commit(), (err) => onSendFailed(err, draftBackup, voice, path));
         // Separate, non-blocking write: sending must still work if the
         // lastMessageAt rule isn't deployed yet.
-        await updateDoc(doc(db, 'rooms', targetId), { lastMessageAt: serverTimestamp() }).catch(
+        void updateDoc(doc(db, 'rooms', targetId), { lastMessageAt: serverTimestamp() }).catch(
           (err) => console.warn('lastMessageAt update skipped:', err?.message ?? err)
         );
       }
+      lastSentAtRef.current = Date.now();
       markRead();
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, path);
+      onSendFailed(err, draftBackup, voice, path);
     } finally {
       setSending(false);
       composerRef.current?.focus();
@@ -899,7 +992,8 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     }
   };
   const visibleMessages = useMemo(() => {
-    const base = blockedSet.size ? messages.filter((m) => !blockedSet.has(m.senderUid)) : messages;
+    let base = blockedSet.size ? messages.filter((m) => !blockedSet.has(m.senderUid)) : messages;
+    if (onlyOpenQuestions && mode === 'room') base = base.filter(isOpenQuestion);
     if (!normalizedQuery) return base;
     return base.filter(
       (m) =>
@@ -907,7 +1001,19 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         m.senderName?.toLowerCase().includes(normalizedQuery) ||
         m.senderNickname?.toLowerCase().includes(normalizedQuery)
     );
-  }, [messages, normalizedQuery, blockedSet]);
+  }, [messages, normalizedQuery, blockedSet, onlyOpenQuestions, mode]);
+  const openQuestionsCount = useMemo(
+    () => (mode === 'room' ? messages.filter((m) => isOpenQuestion(m) && !blockedSet.has(m.senderUid)).length : 0),
+    [messages, mode, blockedSet]
+  );
+
+  mentionSelf = currentUserProfile.nickname?.toLowerCase() ?? '';
+  useEffect(() => {
+    primeProfile(myUid, currentUserProfile.photoUrl, currentUserProfile.name);
+  }, [myUid, currentUserProfile.photoUrl, currentUserProfile.name]);
+  const photoFor = useProfilePhotos(
+    visibleMessages.filter((m) => m.senderPhoto === '@p').map((m) => m.senderUid)
+  );
 
   const backdropStyle = resolveChatBackdropStyle(settings, themeMode);
   const myBg = resolveBubbleSurface(settings.myBubbleColor, themeMode);
@@ -1031,7 +1137,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
           <span className={`w-8 sm:w-9 shrink-0 ${isMine ? 'max-sm:hidden' : ''}`} aria-hidden="true" />
         ) : (
           <AvatarImg
-            src={msg.senderPhoto}
+            src={photoFor(msg.senderUid, msg.senderPhoto)}
             name={msg.senderName}
             sizeClass="w-8 h-8 sm:w-9 sm:h-9"
             className={`shadow-sm ring-2 ring-white dark:ring-[#171A23] ${isMine ? 'max-sm:hidden' : ''}`}
@@ -1380,6 +1486,27 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         </button>
       </div>
 
+      {mode === 'room' && (openQuestionsCount > 0 || onlyOpenQuestions) && (
+        <div className="absolute top-2.5 sm:top-3 start-3 sm:start-4 z-20">
+          <button
+            type="button"
+            onClick={() => setOnlyOpenQuestions((v) => !v)}
+            aria-pressed={onlyOpenQuestions}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold border shadow-sm cursor-pointer transition-colors ${
+              onlyOpenQuestions
+                ? 'bg-[var(--primary)] text-white border-transparent'
+                : 'glass text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:text-violet-600'
+            }`}
+          >
+            <span aria-hidden="true">❓</span>
+            <span>{t.openQuestionsFilter}</span>
+            <span className={`tabular-nums px-1.5 rounded-full text-[10px] ${onlyOpenQuestions ? 'bg-white/25' : 'bg-slate-100 dark:bg-slate-800'}`}>
+              {openQuestionsCount}
+            </span>
+          </button>
+        </div>
+      )}
+
       {/* Messages Stream */}
       <div
         ref={scrollRef}
@@ -1404,7 +1531,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
           </div>
         ) : visibleMessages.length === 0 ? (
           <div className="h-full flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">
-            {t.searchNoResults}
+            {onlyOpenQuestions && !normalizedQuery ? t.openQuestionsEmpty : t.searchNoResults}
           </div>
         ) : (
           <>

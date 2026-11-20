@@ -32,6 +32,7 @@ export async function deleteMyAccount(): Promise<void> {
     doc(db, 'users_private', uid),
     doc(db, 'blocks', uid),
     doc(db, 'read_states', uid),
+    doc(db, 'rate_limits', uid),
   ].filter(Boolean) as ReturnType<typeof doc>[];
 
   for (const ref of refs) {

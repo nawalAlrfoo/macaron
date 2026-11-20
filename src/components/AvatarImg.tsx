@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { assetUrl } from '@/src/utils/image';
 
 interface AvatarImgProps {
@@ -15,6 +15,8 @@ export const AvatarImg: React.FC<AvatarImgProps> = ({
   className = '',
 }) => {
   const [failed, setFailed] = useState(false);
+  // a new photo gets a fresh chance to load
+  useEffect(() => setFailed(false), [src]);
 
   const initials = (name || '?')
     .trim()
@@ -40,6 +42,8 @@ export const AvatarImg: React.FC<AvatarImgProps> = ({
       src={assetUrl(src)}
       alt={name}
       referrerPolicy="no-referrer"
+      loading="lazy"
+      decoding="async"
       onError={() => setFailed(true)}
       className={`${sizeClass} rounded-full object-cover shrink-0 border border-slate-200/80 dark:border-slate-700 bg-amber-50 dark:bg-slate-800 ${className}`}
     />

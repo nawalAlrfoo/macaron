@@ -1,7 +1,17 @@
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { doc, getDocFromServer, getFirestore } from 'firebase/firestore';
+import {
+  doc,
+  getDocFromServer,
+  getFirestore,
+  clearIndexedDbPersistence,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  terminate,
+  type Firestore,
+} from 'firebase/firestore';
 import firebaseConfig from '@/firebase-applet-config.json';
 import { errorKeyFor, showToast } from './toast';
 
@@ -17,7 +27,32 @@ const authDomain = SAME_SITE_AUTH_HOSTS.includes(currentHost)
   : firebaseConfig.authDomain;
 
 export const app = initializeApp({ ...firebaseConfig, authDomain });
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Local cache (IndexedDB): chats open instantly on reload and stay readable offline.
+// Falls back to memory only where IndexedDB is unavailable (e.g. some private modes).
+function createDb(): Firestore {
+  try {
+    return initializeFirestore(
+      app,
+      { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) },
+      firebaseConfig.firestoreDatabaseId
+    );
+  } catch (err) {
+    console.warn('Offline cache unavailable, using memory cache:', err);
+    return getFirestore(app, firebaseConfig.firestoreDatabaseId);
+  }
+}
+export const db = createDb();
+
+/** Wipe the local chat cache (shared computers) and start fresh. Call after signing out. */
+export async function clearLocalDataAndReload(): Promise<void> {
+  try {
+    await terminate(db);
+    await clearIndexedDbPersistence(db);
+  } catch (err) {
+    console.warn('Could not clear local cache:', err);
+  }
+  window.location.replace(window.location.pathname);
+}
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 

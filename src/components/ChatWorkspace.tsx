@@ -174,8 +174,19 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     [myUid]
   );
 
+  // The open chat only counts as "seen" while the tab is actually visible,
+  // so new messages there still ring / notify when you are in another tab.
+  const [pageVisible, setPageVisible] = useState(
+    () => typeof document === 'undefined' || document.visibilityState === 'visible'
+  );
+  useEffect(() => {
+    const onVis = () => setPageVisible(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
+
   const isUnread = (key: string, latest?: Timestamp | null, isActive = false) => {
-    if (!readStateLoaded || isActive || !latest?.toMillis) return false;
+    if (!readStateLoaded || (isActive && pageVisible) || !latest?.toMillis) return false;
     const seen = lastRead[key];
     if (seen === null) return false; // pending local write = just read
     if (!seen) return true;

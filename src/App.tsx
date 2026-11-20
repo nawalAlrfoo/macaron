@@ -36,6 +36,7 @@ import { setPrefs, usePrefs } from '@/src/lib/prefs';
 import {
   ADMIN_BOOTSTRAP_EMAIL,
   auth,
+  clearLocalDataAndReload,
   db,
   googleProvider,
   handleFirestoreError,
@@ -469,6 +470,7 @@ function MacaronApp() {
       }
     }
     await signOut(auth);
+    await clearLocalDataAndReload();
   };
 
   const handleSaveProfile = async (data: {

@@ -19,14 +19,16 @@ const fmt = (secs: number) => {
 // Fixed pseudo-waveform so every note looks like audio without decoding the file
 const BARS = [6, 10, 14, 9, 16, 12, 7, 13, 17, 11, 8, 15, 10, 6, 12, 16, 9, 13, 7, 11, 14, 8, 10, 6];
 
-export const VoiceNote: React.FC<VoiceNoteProps> = ({ src, duration, isMine, accent, unsupportedLabel, downloadLabel }) => {
+export const VoiceNote: React.FC<VoiceNoteProps> = ({ src: rawSrc, duration, isMine, accent, unsupportedLabel, downloadLabel }) => {
+  // Only real recorded audio is ever used as a source or link (never e.g. a javascript: URL)
+  const src = /^data:audio\/[^,]{1,60};base64,/.test(rawSrc) ? rawSrc : '';
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [total, setTotal] = useState(duration ?? 0);
   // e.g. a WebM/Opus note recorded on Chrome, opened on an older iPhone
   const [unsupported, setUnsupported] = useState(() => {
-    if (!src.startsWith('data:audio/')) return false;
+    if (!src) return true;
     const end = src.search(/[;,]/);
     const mime = src.slice(5, end > 0 ? end : undefined);
     try {
@@ -100,9 +102,11 @@ export const VoiceNote: React.FC<VoiceNoteProps> = ({ src, duration, isMine, acc
     return (
       <div className={`flex items-center gap-3 text-xs ${isMine ? 'text-white/85' : 'text-slate-500 dark:text-slate-400'}`}>
         <span>🎙️ {unsupportedLabel || "Can't play this recording here"}</span>
-        <a href={src} download="macaron-voice" onClick={(e) => e.stopPropagation()} className="underline font-semibold">
-          {downloadLabel || 'Download'}
-        </a>
+        {src && (
+          <a href={src} download="macaron-voice" onClick={(e) => e.stopPropagation()} className="underline font-semibold">
+            {downloadLabel || 'Download'}
+          </a>
+        )}
       </div>
     );
   }

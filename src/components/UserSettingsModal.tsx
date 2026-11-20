@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/src/lib/firebase';
+import { clearLocalDataAndReload, db } from '@/src/lib/firebase';
 import { unblockUser } from '@/src/lib/moderation';
 import { deleteMyAccount } from '@/src/lib/account';
 import { showToast } from '@/src/lib/toast';
@@ -141,6 +141,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
     try {
       await deleteMyAccount();
       showToast({ kind: 'success', key: 'accountDeletedToast' });
+      window.setTimeout(() => void clearLocalDataAndReload(), 1800);
     } catch (err: any) {
       const code = err?.code ?? '';
       if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {

@@ -31,6 +31,7 @@ import { OnboardingView } from '@/src/components/OnboardingView';
 import { MacaronLogo } from '@/src/components/MacaronLogo';
 import { InfoPage, type InfoPageId } from '@/src/components/InfoPage';
 import { TRANSLATIONS } from '@/src/i18n/translations';
+import { setPrefs, usePrefs } from '@/src/lib/prefs';
 import {
   ADMIN_BOOTSTRAP_EMAIL,
   auth,
@@ -77,6 +78,26 @@ function MacaronApp() {
   const [hasLocalLangOverride, setHasLocalLangOverride] = useState(false);
   const [hasLocalThemeOverride, setHasLocalThemeOverride] = useState(false);
 
+  // Device preferences (theme incl. "system", font size, language, notifications…)
+  const prefs = usePrefs();
+  const [systemDark, setSystemDark] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!mq) return;
+    const onChange = () => setSystemDark(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  const effectiveTheme: ThemeMode =
+    prefs.theme === 'system' ? (systemDark ? 'dark' : 'light') : prefs.theme;
+  const effectiveLanguage: Language = prefs.language ?? language;
+
+  useEffect(() => {
+    document.documentElement.dataset.font = prefs.fontSize;
+  }, [prefs.fontSize]);
+
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
   const [directChats, setDirectChats] = useState<DirectChat[]>([]);
   const [members, setMembers] = useState<UserPublicProfile[]>([]);
@@ -109,14 +130,14 @@ function MacaronApp() {
   // Sync HTML dir/lang/dark class
   useEffect(() => {
     const root = document.documentElement;
-    root.dir = language === 'ar' ? 'rtl' : 'ltr';
-    root.lang = language;
-    if (themeMode === 'dark') {
+    root.dir = effectiveLanguage === 'ar' ? 'rtl' : 'ltr';
+    root.lang = effectiveLanguage;
+    if (effectiveTheme === 'dark') {
       root.classList.add('dark');
     } else {
       root.classList.remove('dark');
     }
-  }, [language, themeMode]);
+  }, [effectiveLanguage, effectiveTheme]);
 
   // Listen to global site theme settings (readable even before sign-in)
   useEffect(() => {
@@ -437,7 +458,7 @@ function MacaronApp() {
   }) => {
     if (!user) return;
 
-    const t = TRANSLATIONS[language];
+    const t = TRANSLATIONS[effectiveLanguage];
     const cleanName = data.name.trim().slice(0, VALIDATION_LIMITS.MAX_NAME_LEN);
     const cleanNickname = normalizeNickname(data.nickname);
     if (!NICKNAME_REGEX.test(cleanNickname)) {
@@ -649,19 +670,21 @@ function MacaronApp() {
   const handleLanguageChange = (lang: Language) => {
     setHasLocalLangOverride(true);
     setLanguage(lang);
+    setPrefs({ language: lang });
   };
 
   const handleThemeModeChange = (mode: ThemeMode) => {
     setHasLocalThemeOverride(true);
     setThemeMode(mode);
+    setPrefs({ theme: mode });
   };
 
   if (infoPage) {
     return (
       <InfoPage
         page={infoPage}
-        language={language}
-        backLabel={TRANSLATIONS[language].backHome}
+        language={effectiveLanguage}
+        backLabel={TRANSLATIONS[effectiveLanguage].backHome}
         onClose={() => {
           history.replaceState(null, '', window.location.pathname + window.location.search);
           setInfoPage(null);
@@ -678,7 +701,7 @@ function MacaronApp() {
             <MacaronLogo size={64} />
           </span>
           <span className="text-sm font-semibold">
-            {language === 'ar' ? 'جاري التحميل...' : 'Loading...'}
+            {effectiveLanguage === 'ar' ? 'جاري التحميل...' : 'Loading...'}
           </span>
         </div>
       </div>
@@ -698,8 +721,8 @@ function MacaronApp() {
     return (
       <OnboardingView
         user={user}
-        language={language}
-        themeMode={themeMode}
+        language={effectiveLanguage}
+        themeMode={effectiveTheme}
         settings={settings}
         onToggleLanguage={handleLanguageChange}
         onToggleThemeMode={handleThemeModeChange}
@@ -721,8 +744,8 @@ function MacaronApp() {
       currentUserProfile={publicProfile}
       currentEmail={privateInfo.email}
       isAdmin={isAdmin}
-      language={language}
-      themeMode={themeMode}
+      language={effectiveLanguage}
+      themeMode={effectiveTheme}
       settings={settings}
       rooms={rooms}
       directChats={directChats}

@@ -126,6 +126,34 @@ export interface Translations {
   noDirectChatsYet: string;
   groupChatBadge: string;
   privateChatBadge: string;
+  settingsSavedOnDevice: string;
+  settingsAppearance: string;
+  themeSystem: string;
+  settingsFontSize: string;
+  fontSmall: string;
+  fontMedium: string;
+  fontLarge: string;
+  settingsNotifications: string;
+  settingsSound: string;
+  settingsSoundHint: string;
+  settingsTestSound: string;
+  settingsDesktop: string;
+  settingsDesktopHint: string;
+  settingsDesktopDenied: string;
+  settingsDesktopUnsupported: string;
+  settingsTyping: string;
+  settingsEnterToSend: string;
+  settingsEnterOn: string;
+  settingsEnterOff: string;
+  voiceRecord: string;
+  voiceRecording: string;
+  voiceCancel: string;
+  voiceSend: string;
+  voiceMessage: string;
+  voiceMicDenied: string;
+  voiceUnsupported: string;
+  voiceTooLong: string;
+  newMessageNotif: string;
   nicknameHint: string;
   nicknameInvalid: string;
   nicknameTaken: string;
@@ -304,6 +332,34 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     noDirectChatsYet: 'ابحث عن شخص باسم المستخدم وابعتله طلب محادثة.',
     groupChatBadge: 'دردشة جماعية',
     privateChatBadge: 'دردشة خاصة',
+    settingsSavedOnDevice: 'بتنحفظ على هالجهاز وبتقدر تغيّرها بأي وقت.',
+    settingsAppearance: 'المظهر',
+    themeSystem: 'حسب الجهاز',
+    settingsFontSize: 'حجم الخط',
+    fontSmall: 'صغير',
+    fontMedium: 'عادي',
+    fontLarge: 'كبير',
+    settingsNotifications: 'الإشعارات',
+    settingsSound: 'صوت للرسائل الجديدة',
+    settingsSoundHint: 'نغمة خفيفة لما توصلك رسالة بمحادثة ثانية.',
+    settingsTestSound: 'جرّب الصوت',
+    settingsDesktop: 'إشعارات المتصفح',
+    settingsDesktopHint: 'إشعار على الشاشة لما يوصلك إشي والموقع مش مفتوح قدامك.',
+    settingsDesktopDenied: 'المتصفح مانع الإشعارات لهالموقع. فعّلها من إعدادات المتصفح.',
+    settingsDesktopUnsupported: 'المتصفح هاد ما بيدعم الإشعارات.',
+    settingsTyping: 'الكتابة',
+    settingsEnterToSend: 'Enter للإرسال',
+    settingsEnterOn: 'Enter بيبعت، و Shift+Enter لسطر جديد.',
+    settingsEnterOff: 'Enter لسطر جديد، و Ctrl+Enter بيبعت.',
+    voiceRecord: 'تسجيل رسالة صوتية',
+    voiceRecording: 'عم يسجّل…',
+    voiceCancel: 'إلغاء التسجيل',
+    voiceSend: 'إرسال الصوت',
+    voiceMessage: '🎤 رسالة صوتية',
+    voiceMicDenied: 'ما في إذن للمايكروفون. اسمح للموقع يستخدمه من إعدادات المتصفح.',
+    voiceUnsupported: 'المتصفح هاد ما بيدعم تسجيل الصوت.',
+    voiceTooLong: 'التسجيل طويل كثير، الحد الأقصى دقيقتين.',
+    newMessageNotif: 'رسالة جديدة',
     nicknameHint: 'حروف إنجليزية صغيرة وأرقام و _ أو . (من 3 لـ 20). لازم يكون فريد، والناس بيلاقوك فيه.',
     nicknameInvalid: 'اسم المستخدم لازم يكون من 3 لـ 20 حرف: حروف إنجليزية صغيرة أو أرقام أو _ أو .',
     nicknameTaken: 'اسم المستخدم هاد محجوز، جرّب اسم ثاني.',
@@ -480,6 +536,34 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     noDirectChatsYet: 'Find someone by username and send them a chat request.',
     groupChatBadge: 'Group Chat',
     privateChatBadge: 'Private Chat',
+    settingsSavedOnDevice: 'Saved on this device, change them anytime.',
+    settingsAppearance: 'Appearance',
+    themeSystem: 'System',
+    settingsFontSize: 'Text size',
+    fontSmall: 'Small',
+    fontMedium: 'Normal',
+    fontLarge: 'Large',
+    settingsNotifications: 'Notifications',
+    settingsSound: 'Sound for new messages',
+    settingsSoundHint: 'A soft chime when a message arrives in another conversation.',
+    settingsTestSound: 'Test sound',
+    settingsDesktop: 'Browser notifications',
+    settingsDesktopHint: 'Get a notification when something arrives while the tab is in the background.',
+    settingsDesktopDenied: 'Notifications are blocked for this site. Enable them in your browser settings.',
+    settingsDesktopUnsupported: 'This browser does not support notifications.',
+    settingsTyping: 'Typing',
+    settingsEnterToSend: 'Enter to send',
+    settingsEnterOn: 'Enter sends, Shift+Enter adds a new line.',
+    settingsEnterOff: 'Enter adds a new line, Ctrl+Enter sends.',
+    voiceRecord: 'Record a voice message',
+    voiceRecording: 'Recording…',
+    voiceCancel: 'Cancel recording',
+    voiceSend: 'Send voice',
+    voiceMessage: '🎤 Voice message',
+    voiceMicDenied: 'Microphone access was denied. Allow it in your browser settings.',
+    voiceUnsupported: 'This browser does not support voice recording.',
+    voiceTooLong: 'Recording is too long, the limit is 2 minutes.',
+    newMessageNotif: 'New message',
     nicknameHint: 'Lowercase English letters, numbers, _ or . (3–20). Must be unique; people find you by it.',
     nicknameInvalid: 'Username must be 3–20 characters: lowercase English letters, numbers, _ or .',
     nicknameTaken: 'That username is taken, try another one.',

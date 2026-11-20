@@ -31,6 +31,10 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* Text size preference (Settings → Text size); Tailwind uses rem so everything scales */
+  html[data-font="sm"] { font-size: 93.75%; }
+  html[data-font="lg"] { font-size: 112.5%; }
+
   html[dir="rtl"] {
     font-family: "IBM Plex Sans Arabic", "Inter", system-ui, -apple-system, sans-serif;
   }

@@ -14,6 +14,8 @@ import {
 } from 'firebase/firestore';
 import {
   ArrowDown,
+  Mic,
+  Square,
   Check,
   Copy,
   Edit3,
@@ -49,6 +51,8 @@ import {
   resolveChatBackdropStyle,
 } from '@/src/utils/colors';
 import { compressChatPhotoFile } from '@/src/utils/image';
+import { getPrefs } from '@/src/lib/prefs';
+import { VoiceNote } from './VoiceNote';
 import { AvatarImg } from './AvatarImg';
 import { MacaronLogo } from './MacaronLogo';
 
@@ -430,13 +434,13 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     else clearTyping(targetId);
   };
 
-  const handleSend = async (e?: React.FormEvent) => {
+  const handleSend = async (e?: React.FormEvent, voice?: { url: string; duration: number }) => {
     e?.preventDefault();
     if (!targetId) return;
 
-    const clean = text.trim().slice(0, VALIDATION_LIMITS.MAX_MESSAGE_LEN);
-    const hasPhoto = Boolean(attachedPhoto && attachedPhoto.length > 0);
-    if ((!clean && !hasPhoto) || sending) return;
+    const clean = voice ? '' : text.trim().slice(0, VALIDATION_LIMITS.MAX_MESSAGE_LEN);
+    const hasPhoto = !voice && Boolean(attachedPhoto && attachedPhoto.length > 0);
+    if ((!clean && !hasPhoto && !voice) || sending) return;
 
     setSending(true);
     setShowEmojiTray(false);
@@ -469,25 +473,32 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         payload.imageUrl = attachedPhoto.slice(0, VALIDATION_LIMITS.MAX_CHAT_IMAGE_LEN);
       }
 
+      if (voice) {
+        payload.audioUrl = voice.url;
+        payload.audioDuration = Math.round(voice.duration);
+      }
+
       if (replyTo) {
         payload.replyToId = replyTo.id.slice(0, VALIDATION_LIMITS.MAX_ID_LEN);
         payload.replyToSender = replyTo.senderName.slice(0, VALIDATION_LIMITS.MAX_NAME_LEN);
-        payload.replyToText = (replyTo.text || t.photoSentPreview).slice(
+        payload.replyToText = (replyTo.text || (replyTo.audioUrl ? t.voiceMessage : t.photoSentPreview)).slice(
           0,
           VALIDATION_LIMITS.MAX_REPLY_TEXT_LEN
         );
       }
 
       // Clear the composer right away so it feels instant
-      setText('');
-      setAttachedPhoto(null);
+      if (!voice) {
+        setText('');
+        setAttachedPhoto(null);
+      }
       setReplyTo(null);
 
       if (mode === 'direct' && directChat) {
         const batch = writeBatch(db);
         batch.set(doc(db, 'direct_chats', targetId, 'messages', msgId), payload);
         batch.update(doc(db, 'direct_chats', targetId), {
-          lastMessageText: (clean || t.photoSentPreview).slice(0, 200),
+          lastMessageText: (clean || (voice ? t.voiceMessage : t.photoSentPreview)).slice(0, 200),
           updatedAt: serverTimestamp(),
           // the single message allowed while the chat is still a request
           ...(isPending && iRequested ? { requestMessageSent: true } : {}),
@@ -510,8 +521,106 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     }
   };
 
+  // ---------- Voice messages ----------
+  const [recording, setRecording] = useState(false);
+  const [recSeconds, setRecSeconds] = useState(0);
+  const [voiceError, setVoiceError] = useState('');
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recStreamRef = useRef<MediaStream | null>(null);
+  const recChunksRef = useRef<Blob[]>([]);
+  const recStartRef = useRef(0);
+  const recCancelledRef = useRef(false);
+  const recTimerRef = useRef<number | null>(null);
+
+  const stopStream = () => {
+    recStreamRef.current?.getTracks().forEach((tr) => tr.stop());
+    recStreamRef.current = null;
+    if (recTimerRef.current) window.clearInterval(recTimerRef.current);
+    recTimerRef.current = null;
+  };
+
+  const startRecording = async () => {
+    setVoiceError('');
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setVoiceError(t.voiceUnsupported);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recStreamRef.current = stream;
+      const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'].find(
+        (m) => MediaRecorder.isTypeSupported?.(m)
+      );
+      const rec = new MediaRecorder(stream, {
+        ...(mimeType ? { mimeType } : {}),
+        audioBitsPerSecond: 24000,
+      });
+      recChunksRef.current = [];
+      recCancelledRef.current = false;
+      rec.ondataavailable = (ev) => {
+        if (ev.data.size > 0) recChunksRef.current.push(ev.data);
+      };
+      rec.onstop = () => {
+        const duration = (Date.now() - recStartRef.current) / 1000;
+        stopStream();
+        setRecording(false);
+        if (recCancelledRef.current || duration < 0.5) return;
+        const blob = new Blob(recChunksRef.current, { type: rec.mimeType || 'audio/webm' });
+        const reader = new FileReader();
+        reader.onload = () => {
+          const url = String(reader.result || '');
+          if (url.length > VALIDATION_LIMITS.MAX_AUDIO_LEN) {
+            setVoiceError(t.voiceTooLong);
+            return;
+          }
+          void handleSend(undefined, { url, duration });
+        };
+        reader.readAsDataURL(blob);
+      };
+      recorderRef.current = rec;
+      recStartRef.current = Date.now();
+      rec.start(250);
+      setRecSeconds(0);
+      setRecording(true);
+      clearTyping(targetId);
+      recTimerRef.current = window.setInterval(() => {
+        const secs = Math.floor((Date.now() - recStartRef.current) / 1000);
+        setRecSeconds(secs);
+        if (secs >= VALIDATION_LIMITS.MAX_VOICE_SECONDS) recorderRef.current?.stop();
+      }, 250);
+    } catch {
+      stopStream();
+      setVoiceError(t.voiceMicDenied);
+    }
+  };
+
+  const finishRecording = (cancel: boolean) => {
+    recCancelledRef.current = cancel;
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+      recorderRef.current.stop();
+    } else {
+      stopStream();
+      setRecording(false);
+    }
+  };
+
+  // Stop the microphone if the user switches conversation while recording
+  useEffect(() => {
+    return () => {
+      recCancelledRef.current = true;
+      if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
+      stopStream();
+    };
+  }, [targetId]);
+
+  const fmtSecs = (secs: number) => `${Math.floor(secs / 60)}:${String(Math.floor(secs % 60)).padStart(2, '0')}`;
+
   const handleComposerKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+    const enterSends = getPrefs().enterToSend;
+    const isSendCombo = enterSends
+      ? e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing
+      : e.key === 'Enter' && (e.ctrlKey || e.metaKey);
+    if (isSendCombo) {
       e.preventDefault();
       void handleSend();
     } else if (e.key === 'Escape') {
@@ -814,6 +923,15 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
               </button>
             )}
 
+            {msg.audioUrl && (
+              <VoiceNote
+                src={msg.audioUrl}
+                duration={msg.audioDuration}
+                isMine={isMine}
+                accent={settings.primaryColor}
+              />
+            )}
+
             {editingMsgId === msg.id ? (
               <div className="space-y-2 min-w-[200px]" onClick={(e) => e.stopPropagation()}>
                 <input
@@ -928,7 +1046,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
                   )}
                 </button>
               )}
-              {isMine && (
+              {isMine && !msg.audioUrl && (
                 <button
                   type="button"
                   onClick={() => {
@@ -1114,7 +1232,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
               <span className="font-semibold text-slate-700 dark:text-slate-200">
                 {t.replyingTo} {replyTo.senderName}:{' '}
               </span>
-              <span className="text-slate-500 dark:text-slate-400">{replyTo.text || t.photoSentPreview}</span>
+              <span className="text-slate-500 dark:text-slate-400">{replyTo.text || (replyTo.audioUrl ? t.voiceMessage : t.photoSentPreview)}</span>
             </div>
             <button
               type="button"
@@ -1188,6 +1306,45 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         {isPending && iRequested && !requestUsed && (
           <p className="mb-2 px-2 text-[11px] text-slate-500 dark:text-slate-400">{t.requestOneMessageHint}</p>
         )}
+        {voiceError && (
+          <div className="mb-2 px-4 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 text-xs text-rose-700 dark:text-rose-300 flex items-center justify-between gap-3">
+            <span>{voiceError}</span>
+            <button type="button" onClick={() => setVoiceError('')} className="cursor-pointer" aria-label={t.closeBtn}>
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+        {recording ? (
+          <div className="flex items-center gap-3 p-1.5 ps-4 rounded-2xl border border-rose-200 dark:border-rose-900/60 bg-white dark:bg-[#171A23] shadow-sm">
+            <span className="relative flex w-2.5 h-2.5" aria-hidden="true">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75 animate-ping" />
+              <span className="relative inline-flex w-2.5 h-2.5 rounded-full bg-rose-500" />
+            </span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{t.voiceRecording}</span>
+            <span className="tabular-nums text-sm text-slate-500 dark:text-slate-400" dir="ltr">
+              {fmtSecs(recSeconds)} / {fmtSecs(VALIDATION_LIMITS.MAX_VOICE_SECONDS)}
+            </span>
+            <span className="flex-1" />
+            <button
+              type="button"
+              onClick={() => finishRecording(true)}
+              title={t.voiceCancel}
+              className="p-2.5 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => finishRecording(false)}
+              title={t.voiceSend}
+              className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl text-xs font-semibold text-white cursor-pointer hover:brightness-110"
+              style={{ background: gradient }}
+            >
+              <Square className="w-3.5 h-3.5 fill-current" />
+              <span className="hidden sm:inline">{t.voiceSend}</span>
+            </button>
+          </div>
+        ) : (
         <form
           onSubmit={handleSend}
           className="glass-strong flex items-end gap-1.5 p-1.5 ps-2 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-sm dark:shadow-sm focus-within:ring-4 focus-within:ring-violet-200/50 dark:focus-within:ring-violet-500/15 transition-shadow"
@@ -1231,16 +1388,31 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
             className="flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-relaxed text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none min-w-0 max-h-36 pastel-scroll"
           />
 
-          <button
-            type="submit"
-            disabled={(!text.trim() && !attachedPhoto) || sending}
-            className="inline-flex items-center justify-center gap-2 h-10 min-w-10 px-3 sm:px-4 rounded-xl text-xs font-semibold text-white transition-all hover:brightness-110 active:scale-95 disabled:opacity-40 cursor-pointer shrink-0"
-            style={{ background: gradient }}
-          >
-            <span className="hidden sm:inline">{t.sendMessage}</span>
-            <Send className="w-4 h-4 rtl:-scale-x-100" />
-          </button>
+          {!text.trim() && !attachedPhoto ? (
+            <button
+              type="button"
+              onClick={startRecording}
+              disabled={sending}
+              title={t.voiceRecord}
+              aria-label={t.voiceRecord}
+              className="inline-flex items-center justify-center h-10 w-10 rounded-xl text-white transition-all hover:brightness-110 active:scale-95 disabled:opacity-40 cursor-pointer shrink-0"
+              style={{ background: gradient }}
+            >
+              <Mic className="w-4 h-4" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={sending}
+              className="inline-flex items-center justify-center gap-2 h-10 min-w-10 px-3 sm:px-4 rounded-xl text-xs font-semibold text-white transition-all hover:brightness-110 active:scale-95 disabled:opacity-40 cursor-pointer shrink-0"
+              style={{ background: gradient }}
+            >
+              <span className="hidden sm:inline">{t.sendMessage}</span>
+              <Send className="w-4 h-4 rtl:-scale-x-100" />
+            </button>
+          )}
         </form>
+        )}
         </>
         )}
       </div>

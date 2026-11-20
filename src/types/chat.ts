@@ -15,6 +15,8 @@ export const VALIDATION_LIMITS = {
   MAX_EMAIL_LEN: 120,
   MAX_PHOTO_LEN: 60000,
   MAX_CHAT_IMAGE_LEN: 250000,
+  MAX_AUDIO_LEN: 700000,
+  MAX_VOICE_SECONDS: 120,
   MAX_MESSAGE_LEN: 1000,
   MAX_ROOM_DESC_LEN: 160,
   MAX_REPLY_TEXT_LEN: 200,
@@ -90,6 +92,9 @@ export interface ChatMessage {
   senderPhoto: string;
   text: string;
   imageUrl?: string;
+  /** Voice note as a data URL (audio/webm or audio/mp4), max ~2 minutes */
+  audioUrl?: string;
+  audioDuration?: number;
   replyToId?: string;
   replyToSender?: string;
   replyToText?: string;

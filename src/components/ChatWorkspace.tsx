@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { TRANSLATIONS } from '@/src/i18n/translations';
 import { db } from '@/src/lib/firebase';
+import { getPrefs, playChime } from '@/src/lib/prefs';
 import {
   AccentTone,
   AdminRecord,
@@ -315,6 +316,33 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   useEffect(() => {
     document.title = unreadTotal > 0 ? `(${unreadTotal}) ${siteTitle}` : siteTitle;
   }, [unreadTotal, siteTitle]);
+
+  // Sound + browser notification when a new conversation becomes unread
+  const prevUnreadRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!readStateLoaded) return; // wait until we know what was already read
+    const prev = prevUnreadRef.current;
+    prevUnreadRef.current = unreadTotal;
+    if (prev === null || unreadTotal <= prev) return; // first load or messages read
+    const p = getPrefs();
+    if (p.sound) playChime();
+    if (
+      p.desktopNotifications &&
+      document.visibilityState !== 'visible' &&
+      'Notification' in window &&
+      Notification.permission === 'granted'
+    ) {
+      try {
+        const n = new Notification(siteTitle, { body: t.newMessageNotif, icon: '/icon-192.png', tag: 'macaron-unread' });
+        n.onclick = () => {
+          window.focus();
+          n.close();
+        };
+      } catch {
+        // some mobile browsers only allow notifications from a service worker
+      }
+    }
+  }, [unreadTotal, readStateLoaded, siteTitle, t.newMessageNotif]);
 
   const sidebarContent = (
     <div className="glass-strong h-full flex flex-col border-e border-slate-200 dark:border-slate-800/80 shadow-sm">
@@ -845,8 +873,14 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         <UserSettingsModal
           language={language}
           themeMode={themeMode}
+          profile={currentUserProfile}
           onChangeLanguage={onChangeLanguage}
           onChangeThemeMode={onChangeThemeMode}
+          onEditProfile={() => {
+            setShowSettingsModal(false);
+            setShowEditProfile(true);
+          }}
+          onSignOut={onSignOut}
           onClose={() => setShowSettingsModal(false)}
         />
       )}

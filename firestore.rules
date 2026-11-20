@@ -188,7 +188,7 @@ service cloud.firestore {
         ])
         && data.keys().hasOnly([
           'id', 'roomId', 'senderUid', 'senderName', 'senderNickname',
-          'senderPhoto', 'text', 'imageUrl', 'replyToId', 'replyToSender', 'replyToText',
+          'senderPhoto', 'text', 'imageUrl', 'audioUrl', 'audioDuration', 'replyToId', 'replyToSender', 'replyToText',
           'reactions', 'createdAt', 'updatedAt'
         ])
         && isValidId(data.id)
@@ -201,7 +201,9 @@ service cloud.firestore {
         && data.senderPhoto is string && data.senderPhoto.size() >= 1 && data.senderPhoto.size() <= 60000
         && data.text is string && data.text.size() <= 1000
         && (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() >= 1 && data.imageUrl.size() <= 250000))
-        && (data.text.size() >= 1 || ('imageUrl' in data && data.imageUrl.size() >= 1))
+        && (!('audioUrl' in data) || (data.audioUrl is string && data.audioUrl.size() >= 1 && data.audioUrl.size() <= 700000))
+        && (!('audioDuration' in data) || (data.audioDuration is number && data.audioDuration >= 0 && data.audioDuration <= 130))
+        && (data.text.size() >= 1 || ('imageUrl' in data && data.imageUrl.size() >= 1) || ('audioUrl' in data && data.audioUrl.size() >= 1))
         && (!('replyToId' in data) || (data.replyToId is string && data.replyToId.size() <= 128))
         && (!('replyToSender' in data) || (data.replyToSender is string && data.replyToSender.size() <= 60))
         && (!('replyToText' in data) || (data.replyToText is string && data.replyToText.size() <= 200))
@@ -251,7 +253,7 @@ service cloud.firestore {
         ])
         && data.keys().hasOnly([
           'id', 'chatId', 'participantUids', 'senderUid', 'senderName', 'senderNickname',
-          'senderPhoto', 'text', 'imageUrl', 'replyToId', 'replyToSender', 'replyToText',
+          'senderPhoto', 'text', 'imageUrl', 'audioUrl', 'audioDuration', 'replyToId', 'replyToSender', 'replyToText',
           'reactions', 'createdAt', 'updatedAt'
         ])
         && isValidId(data.id)
@@ -266,7 +268,9 @@ service cloud.firestore {
         && data.senderPhoto is string && data.senderPhoto.size() >= 1 && data.senderPhoto.size() <= 60000
         && data.text is string && data.text.size() <= 1000
         && (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() >= 1 && data.imageUrl.size() <= 250000))
-        && (data.text.size() >= 1 || ('imageUrl' in data && data.imageUrl.size() >= 1))
+        && (!('audioUrl' in data) || (data.audioUrl is string && data.audioUrl.size() >= 1 && data.audioUrl.size() <= 700000))
+        && (!('audioDuration' in data) || (data.audioDuration is number && data.audioDuration >= 0 && data.audioDuration <= 130))
+        && (data.text.size() >= 1 || ('imageUrl' in data && data.imageUrl.size() >= 1) || ('audioUrl' in data && data.audioUrl.size() >= 1))
         && (!('replyToId' in data) || (data.replyToId is string && data.replyToId.size() <= 128))
         && (!('replyToSender' in data) || (data.replyToSender is string && data.replyToSender.size() <= 60))
         && (!('replyToText' in data) || (data.replyToText is string && data.replyToText.size() <= 200))

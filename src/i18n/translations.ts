@@ -131,6 +131,10 @@ export interface Translations {
   previewRoomName: string;
   sendTooFast: string;
   threadTitle: string;
+  searchTab: string;
+  moreActions: string;
+  backAction: string;
+  findPeopleCta: string;
   memberSince: string;
   profileUnavailable: string;
   messageThisPerson: string;
@@ -400,6 +404,10 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     bestAnswerBadge: 'أفضل إجابة',
     previewRoomName: 'البرمجة والتطوير',
     threadTitle: 'السؤال والإجابات',
+    searchTab: 'بحث',
+    moreActions: 'خيارات أكثر',
+    backAction: 'رجوع',
+    findPeopleCta: 'دوّر على حدا بالـ @',
     memberSince: 'عضو من {date}',
     profileUnavailable: 'هالحساب مش موجود هلا.',
     messageThisPerson: 'راسله',
@@ -668,6 +676,10 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     bestAnswerBadge: 'Best answer',
     previewRoomName: 'Programming & Dev',
     threadTitle: 'Question & answers',
+    searchTab: 'Search',
+    moreActions: 'More',
+    backAction: 'Back',
+    findPeopleCta: 'Find someone by @username',
     memberSince: 'Member since {date}',
     profileUnavailable: 'This account is no longer available.',
     messageThisPerson: 'Message',

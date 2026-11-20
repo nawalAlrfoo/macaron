@@ -21,18 +21,25 @@ export const AvatarImg: React.FC<AvatarImgProps> = ({
   const initials = (name || '?')
     .trim()
     .split(/\s+/)
-    .slice(0, 2)
+    .slice(0, 1)
     .map((part) => part[0])
     .join('')
     .toUpperCase();
 
   if (!src || failed) {
+    // calm, stable colour per person (same name → same colour)
+    const tones = ['#6E56CF', '#3B82C4', '#C2577A', '#2F9C88', '#C98A2E', '#7A6BB0', '#4E7A9E'];
+    let h = 0;
+    for (const ch of name || '?') h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    const tone = tones[h % tones.length];
+    const px = Number(/w-(\d+(?:\.\d+)?)/.exec(sizeClass)?.[1] ?? 10) * 4;
     return (
       <div
         aria-label={name}
-        className={`${sizeClass} rounded-full flex items-center justify-center font-semibold text-slate-700 dark:text-slate-200 shrink-0 select-none bg-gradient-to-br from-[#FEF08A] via-[#FBCFE8] to-[#BAE6FD] dark:from-[#4B4429] dark:via-[#4A2B3D] dark:to-[#243B53] border border-slate-200 dark:border-slate-700 ${className}`}
+        className={`${sizeClass} rounded-full flex items-center justify-center font-semibold shrink-0 select-none ${className}`}
+        style={{ backgroundColor: `${tone}22`, color: tone, fontSize: Math.max(10, Math.round(px * 0.38)) }}
       >
-        <span className="text-xs">{initials}</span>
+        <span>{initials}</span>
       </div>
     );
   }

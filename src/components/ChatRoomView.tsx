@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   Flag,
   Mic,
+  Camera,
   Square,
   Check,
   Copy,
@@ -29,6 +30,7 @@ import {
   Send,
   Smile,
   SmilePlus,
+  MoreHorizontal,
   Trash2,
   X,
 } from 'lucide-react';
@@ -40,6 +42,7 @@ import {
   DirectChat,
   isChatAccepted,
   Language,
+  DEFAULT_SITE_SETTINGS,
   REACTION_EMOJIS,
   readKey,
   SiteSettings,
@@ -63,6 +66,7 @@ import { renderRichText, setMentionSelf } from './RichText';
 import { markSent, repliesLabel, waitForSendSlot } from '@/src/lib/send';
 import { ThreadPanel } from './ThreadPanel';
 import { ProfileCard, type ProfileCardTarget } from './ProfileCard';
+import { MessageSheet, QUICK_REACTIONS } from './MessageSheet';
 import { ReportDialog, type ReportTarget } from './ReportDialog';
 import { AvatarImg } from './AvatarImg';
 import { MacaronLogo } from './MacaronLogo';
@@ -458,6 +462,8 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     const el = composerRef.current;
     if (!el) return;
     el.style.height = 'auto';
+    // hidden (e.g. phone list screen showing): measure later instead of locking it at 0px
+    if (!el.scrollHeight) return;
     el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
   };
 
@@ -905,468 +911,454 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     visibleMessages.filter((m) => m.senderPhoto === '@p').map((m) => m.senderUid)
   );
 
-  const backdropStyle = resolveChatBackdropStyle(settings, themeMode);
+  const plainBackdrop = settings.chatBgStyle === DEFAULT_SITE_SETTINGS.chatBgStyle;
+  const backdropStyle: React.CSSProperties = plainBackdrop
+    ? { backgroundColor: 'var(--surface)' }
+    : resolveChatBackdropStyle(settings, themeMode);
   const myBg = resolveBubbleSurface(settings.myBubbleColor, themeMode);
-  const otherBg = resolveBubbleSurface(settings.otherBubbleColor, themeMode);
+  const defaultOther = settings.otherBubbleColor.toUpperCase() === DEFAULT_SITE_SETTINGS.otherBubbleColor.toUpperCase();
+  const otherBg = defaultOther ? 'var(--bubble-other)' : resolveBubbleSurface(settings.otherBubbleColor, themeMode);
   const myText = getReadableTextColor(myBg);
-  const otherText = getReadableTextColor(otherBg);
+  const otherText = defaultOther ? (themeMode === 'dark' ? '#F2F2F5' : '#111114') : getReadableTextColor(otherBg);
   const gradient = settings.primaryColor;
 
-  const getBubbleRadius = (isMine: boolean, grouped = false) => {
-    if (settings.bubbleStyle === 'pill') return 'rounded-2xl';
-    if (settings.bubbleStyle === 'classic') {
-      if (grouped) return 'rounded-2xl';
-      return isMine ? 'rounded-2xl rounded-ee-md' : 'rounded-2xl rounded-es-md';
+  // ---------- Touch interactions: long-press menu, double-tap ❤️, swipe to reply ----------
+  const [sheetMsg, setSheetMsg] = useState<ChatMessage | null>(null);
+  const [heartBurstId, setHeartBurstId] = useState<string | null>(null);
+  const closeSheet = useCallback(() => setSheetMsg(null), []);
+  const gestureRef = useRef<{
+    id: string;
+    x: number;
+    y: number;
+    timer: number;
+    dx: number;
+    swiping: boolean;
+    longPressed: boolean;
+    el: HTMLElement | null;
+  } | null>(null);
+  const lastTapRef = useRef<{ id: string; at: number }>({ id: '', at: 0 });
+  const SWIPE_REPLY_PX = 56;
+
+  const vibrate = (ms = 10) => {
+    try {
+      navigator.vibrate?.(ms);
+    } catch {
+      // not supported
     }
-    // "cute": soft tail on the first bubble of a group, rounder for the rest
-    const tail = grouped ? 'rounded-2xl' : '';
-    if (isRtl) {
-      return isMine
-        ? `rounded-2xl rounded-bl-md ${tail}`
-        : `rounded-2xl rounded-br-md ${tail}`;
-    }
-    return isMine
-      ? `rounded-2xl rounded-br-md ${tail}`
-      : `rounded-2xl rounded-bl-md ${tail}`;
   };
 
-  const actionBtn =
-    'p-2 sm:p-1.5 rounded-full glass-strong border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-violet-600 dark:hover:text-violet-300 shadow-xs hover:shadow-sm cursor-pointer transition-all';
+  const startReply = (msg: ChatMessage) => {
+    setReplyTo(msg);
+    setSheetMsg(null);
+    setReactPickerFor(null);
+    composerRef.current?.focus();
+  };
 
+  /** Instagram-style like: double tap always adds ❤️ (never removes it) */
+  const likeMessage = (msg: ChatMessage) => {
+    setHeartBurstId(msg.id);
+    window.setTimeout(() => setHeartBurstId((cur) => (cur === msg.id ? null : cur)), 750);
+    vibrate(12);
+    if (msg.reactions?.[myUid] !== '❤️') void handleToggleReaction(msg, '❤️');
+  };
+
+  const onBubbleTap = (msg: ChatMessage) => {
+    if (gestureRef.current?.longPressed || gestureRef.current?.swiping) return;
+    const now = Date.now();
+    const last = lastTapRef.current;
+    // touch screens: two taps = like (mouse users get onDoubleClick)
+    if (window.matchMedia?.('(pointer: coarse)').matches && last.id === msg.id && now - last.at < 320) {
+      lastTapRef.current = { id: '', at: 0 };
+      likeMessage(msg);
+      return;
+    }
+    lastTapRef.current = { id: msg.id, at: now };
+  };
+
+  const resetSwipe = (el: HTMLElement | null) => {
+    if (!el) return;
+    el.style.transition = 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1)';
+    el.style.transform = '';
+    window.setTimeout(() => {
+      el.style.transition = '';
+    }, 200);
+  };
+
+  const onBubblePointerDown = (e: React.PointerEvent<HTMLDivElement>, msg: ChatMessage) => {
+    if (e.pointerType === 'mouse' || editingMsgId === msg.id) return;
+    const el = e.currentTarget;
+    const g = { id: msg.id, x: e.clientX, y: e.clientY, timer: 0, dx: 0, swiping: false, longPressed: false, el };
+    g.timer = window.setTimeout(() => {
+      g.longPressed = true;
+      vibrate(15);
+      setSheetMsg(msg);
+    }, 430);
+    gestureRef.current = g;
+  };
+
+  const onBubblePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const g = gestureRef.current;
+    if (!g || e.pointerType === 'mouse') return;
+    const dxRaw = e.clientX - g.x;
+    const dy = e.clientY - g.y;
+    if (Math.abs(dxRaw) > 8 || Math.abs(dy) > 8) window.clearTimeout(g.timer);
+    // swipe towards the reading direction's end (right in LTR, left in RTL) = reply
+    const dx = isRtl ? -dxRaw : dxRaw;
+    if (!g.swiping && dx > 12 && Math.abs(dx) > Math.abs(dy) * 1.4) g.swiping = true;
+    if (g.swiping && g.el) {
+      g.dx = Math.max(0, Math.min(dx, 90));
+      const shown = g.dx < SWIPE_REPLY_PX ? g.dx : SWIPE_REPLY_PX + (g.dx - SWIPE_REPLY_PX) * 0.3;
+      g.el.style.transform = `translateX(${isRtl ? -shown : shown}px)`;
+    }
+  };
+
+  const onBubblePointerUp = (_e: React.PointerEvent<HTMLDivElement>, msg: ChatMessage) => {
+    const g = gestureRef.current;
+    if (!g) return;
+    window.clearTimeout(g.timer);
+    if (g.swiping) {
+      if (g.dx >= SWIPE_REPLY_PX) {
+        vibrate(10);
+        startReply(msg);
+      }
+      resetSwipe(g.el);
+    }
+    // keep the flags for the click that follows, then forget the gesture
+    window.setTimeout(() => {
+      if (gestureRef.current === g) gestureRef.current = null;
+    }, 60);
+  };
+
+  const onBubblePointerCancel = () => {
+    const g = gestureRef.current;
+    if (!g) return;
+    window.clearTimeout(g.timer);
+    resetSwipe(g.el);
+    gestureRef.current = null;
+  };
+
+  // ---------- Bubble shape (Instagram Direct style: tight corners inside a group) ----------
+  type GroupPos = 'single' | 'first' | 'middle' | 'last';
+  const bubbleRadius = (isMine: boolean, pos: GroupPos) => {
+    const base = 'rounded-[22px]';
+    if (pos === 'single') return base;
+    if (isMine) {
+      if (pos === 'first') return `${base} rounded-ee-[6px]`;
+      if (pos === 'middle') return `${base} rounded-se-[6px] rounded-ee-[6px]`;
+      return `${base} rounded-se-[6px]`;
+    }
+    if (pos === 'first') return `${base} rounded-es-[6px]`;
+    if (pos === 'middle') return `${base} rounded-ss-[6px] rounded-es-[6px]`;
+    return `${base} rounded-ss-[6px]`;
+  };
+
+  const hoverBtn =
+    'p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:text-slate-100 dark:hover:bg-white/10 cursor-pointer transition-colors';
+
+  // Reactions: one small pill hanging off the bubble corner
   const renderReactions = (msg: ChatMessage, isMine: boolean) => {
     const entries = Object.entries(msg.reactions ?? {});
     if (entries.length === 0) return null;
-    const grouped = new Map<string, string[]>();
-    for (const [uid, emoji] of entries) {
-      grouped.set(emoji, [...(grouped.get(emoji) ?? []), uid]);
-    }
+    const counts = new Map<string, number>();
+    for (const [, emoji] of entries) counts.set(emoji, (counts.get(emoji) ?? 0) + 1);
+    const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([e]) => e);
+    const mine = Boolean(msg.reactions?.[myUid]);
     return (
-      <div className={`flex flex-wrap gap-1 -mt-1.5 px-2 relative z-[1] ${isMine ? 'justify-end' : 'justify-start'}`}>
-        {REACTION_EMOJIS.filter((em) => grouped.has(em)).map((em) => {
-          const uids = grouped.get(em)!;
-          const mine = uids.includes(myUid);
-          return (
-            <button
-              key={em}
-              type="button"
-              onClick={() => handleToggleReaction(msg, em)}
-              className={`pop-in inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border shadow-xs cursor-pointer transition-all hover:-translate-y-0.5 ${
-                mine
-                  ? 'bg-violet-50 dark:bg-violet-950/50 border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-200'
-                  : 'bg-white/85 dark:bg-[#1E2230] border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              <span>{em}</span>
-              <span className="tabular-nums font-semibold">{uids.length}</span>
-            </button>
-          );
-        })}
-      </div>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setSheetMsg(msg);
+        }}
+        className={`pop-in relative z-[2] -mt-2 ${isMine ? 'me-2' : 'ms-2'} inline-flex items-center gap-0.5 ps-1.5 pe-2 py-[3px] rounded-full text-[13px] leading-none border-2 border-[var(--surface)] cursor-pointer shadow-sm ${
+          mine ? 'bg-[var(--primary-soft)]' : 'bg-[var(--surface-2)]'
+        }`}
+      >
+        <span className="tracking-[-0.15em]">{top.join('')}</span>
+        {entries.length > 1 && (
+          <span className="ms-1 text-[11px] font-semibold tabular-nums text-slate-600 dark:text-slate-300">{entries.length}</span>
+        )}
+      </button>
     );
   };
 
-  // Build stream with date separators
-  const streamItems: React.ReactNode[] = [];
-  let lastDay = '';
-  let prevMsg: ChatMessage | null = null;
-  for (const msg of visibleMessages) {
+  // Pre-compute grouping so we know the first AND last bubble of each group
+  const rows = visibleMessages.map((msg, i) => {
+    const prev = visibleMessages[i - 1];
     const date = msg.createdAt?.toDate?.() ?? new Date();
-    const dk = dayKeyOf(date);
-    const newDay = dk !== lastDay;
-    if (newDay) {
-      lastDay = dk;
+    const prevDate = prev?.createdAt?.toDate?.();
+    const newDay = !prevDate || dayKeyOf(prevDate) !== dayKeyOf(date);
+    const thisTime = msg.createdAt?.toMillis?.() ?? Date.now();
+    const prevTime = prev?.createdAt?.toMillis?.() ?? 0;
+    const withPrev =
+      !newDay && !normalizedQuery && !!prev && prev.senderUid === msg.senderUid && thisTime - prevTime < 5 * 60 * 1000;
+    // a long pause inside the same day gets a centred time label, like Instagram
+    const timeBreak = !newDay && !!prev && thisTime - prevTime > 60 * 60 * 1000;
+    return { msg, date, newDay, withPrev: withPrev && !timeBreak, timeBreak };
+  });
+
+  const streamItems: React.ReactNode[] = [];
+  rows.forEach((row, i) => {
+    const { msg, date, newDay, withPrev, timeBreak } = row;
+    const withNext = !!rows[i + 1]?.withPrev;
+    const pos: GroupPos = withPrev ? (withNext ? 'middle' : 'last') : withNext ? 'first' : 'single';
+
+    if (newDay || timeBreak) {
       streamItems.push(
         <div
-          key={`day-${dk}`}
-          className="flex items-center gap-3 pt-5 pb-1 first:pt-0"
+          key={`sep-${msg.id}`}
+          className="flex justify-center pt-6 pb-2 first:pt-1 text-[11px] font-medium text-slate-400 dark:text-slate-500"
           role="separator"
         >
-          <span className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-300/70 to-transparent dark:via-slate-700" />
-          <span className="glass px-3.5 py-1 rounded-full text-[11px] font-bold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700/70 shadow-xs">
-            {formatDayLabel(date)}
-          </span>
-          <span className="flex-1 h-px bg-gradient-to-r from-transparent via-slate-300/70 to-transparent dark:via-slate-700" />
+          {newDay ? formatDayLabel(date) : formatTime(msg)}
         </div>
       );
     }
 
-    // Consecutive messages from the same person within 5 minutes are grouped
-    const prevTime = prevMsg?.createdAt?.toMillis?.() ?? 0;
-    const thisTime = msg.createdAt?.toMillis?.() ?? Date.now();
-    const isGrouped =
-      !newDay &&
-      !normalizedQuery &&
-      prevMsg !== null &&
-      prevMsg.senderUid === msg.senderUid &&
-      thisTime - prevTime < 5 * 60 * 1000;
-    prevMsg = msg;
-
     const isMine = msg.senderUid === myUid;
-    const canModify = isMine || (mode === 'room' && isAdmin);
     const isAccepted = mode === 'room' && acceptedIds.has(msg.id);
-    const question = msg.replyToId ? msgById.get(msg.replyToId) : undefined;
-    const canPickBest = mode === 'room' && !isMine && question?.senderUid === myUid;
     const isEdited =
-      msg.createdAt &&
-      msg.updatedAt &&
-      msg.updatedAt.toMillis() - msg.createdAt.toMillis() > 1500;
-    const actionsVisible =
-      actionsOpenFor === msg.id || reactPickerFor === msg.id || confirmDeleteId === msg.id;
+      msg.createdAt && msg.updatedAt && msg.updatedAt.toMillis() - msg.createdAt.toMillis() > 1500;
+    const showName = mode === 'room' && !isMine && !withPrev;
+    const showAvatar = !isMine && (pos === 'last' || pos === 'single');
+    const isEditing = editingMsgId === msg.id;
+    const imageOnly = Boolean(msg.imageUrl) && !msg.text && !msg.audioUrl && !isEditing;
+    const hasThreadChip = mode === 'room' && !msg.replyToId && (replyCounts[msg.id] || isOpenQuestion(msg));
 
     streamItems.push(
       <div
         key={msg.id}
         data-msg-id={msg.id}
-        className={`msg-in group relative flex max-sm:flex-wrap items-end gap-2 sm:gap-2.5 rounded-2xl transition-colors duration-500 ${
-          isMine ? 'flex-row-reverse' : 'flex-row'
-        } ${isGrouped ? 'mt-1' : 'mt-4'} ${
-          highlightId === msg.id ? 'bg-amber-100/70 dark:bg-amber-500/15 ring-4 ring-amber-100/70 dark:ring-amber-500/15' : ''
+        className={`msg-in group relative flex items-end gap-2 ${isMine ? 'flex-row-reverse' : 'flex-row'} ${
+          withPrev ? 'mt-[3px]' : 'mt-3'
         }`}
       >
-        {isGrouped ? (
-          <span className={`w-8 sm:w-9 shrink-0 ${isMine ? 'max-sm:hidden' : ''}`} aria-hidden="true" />
-        ) : (
-          <button
-            type="button"
-            disabled={isMine}
-            onClick={() => openProfileOf(msg)}
-            aria-label={msg.senderName}
-            className={`shrink-0 rounded-full ${isMine ? 'max-sm:hidden cursor-default' : 'cursor-pointer hover:opacity-90'}`}
-          >
-            <AvatarImg
-              src={photoFor(msg.senderUid, msg.senderPhoto)}
-              name={msg.senderName}
-              sizeClass="w-8 h-8 sm:w-9 sm:h-9"
-              className="shadow-sm ring-2 ring-white dark:ring-[#171A23]"
-            />
-          </button>
-        )}
-
-        <div className={`flex flex-col min-w-0 ${isMine ? 'max-w-[85%]' : 'max-w-[80%]'} sm:max-w-[65%] ${isMine ? 'items-end' : 'items-start'}`}>
-          {/* Metadata */}
-          <div
-            className={`flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400 mb-1 px-1.5 ${
-              isGrouped && !msg.solved && !isAccepted ? 'hidden' : ''
-            }`}
-          >
-            {isMine ? (
-              <span className="font-semibold text-slate-700 dark:text-slate-200">{t.youLabel}</span>
-            ) : (
+        {/* Avatar (others, last bubble of a group) */}
+        {!isMine && (
+          <span className="w-7 shrink-0 self-end mb-[2px]">
+            {showAvatar && (
               <button
                 type="button"
                 onClick={() => openProfileOf(msg)}
-                className="font-semibold text-slate-700 dark:text-slate-200 hover:text-violet-600 dark:hover:text-violet-300 hover:underline cursor-pointer"
+                aria-label={msg.senderName}
+                className="rounded-full cursor-pointer hover:opacity-90"
               >
-                {msg.senderName}
+                <AvatarImg src={photoFor(msg.senderUid, msg.senderPhoto)} name={msg.senderName} sizeClass="w-7 h-7" />
               </button>
             )}
-            <span aria-hidden="true" className="hidden sm:inline">·</span>
-            <span dir="ltr" className="hidden sm:inline">@{msg.senderNickname}</span>
-            <span aria-hidden="true">·</span>
-            <span className="tabular-nums">{formatTime(msg)}</span>
-            {isEdited && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span>{t.editedTag}</span>
-              </>
-            )}
-            {msg.solved && (
-              <span className="ms-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
-                ✅ {t.solvedBadge}
-              </span>
-            )}
-            {isAccepted && (
-              <span className="ms-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300">
-                ⭐ {t.bestAnswerBadge}
-              </span>
-            )}
-          </div>
+          </span>
+        )}
 
-          {/* Bubble */}
-          <div
-            onClick={() => setActionsOpenFor((cur) => (cur === msg.id ? null : msg.id))}
-            className={`relative max-w-full px-3.5 sm:px-4 py-2.5 text-[0.9rem] leading-relaxed space-y-2 shadow-[0_1px_2px_rgba(15,23,42,0.06)] ${
-              isAccepted
-                ? 'border-2 border-amber-300 dark:border-amber-500/60'
-                : isMine
-                  ? 'border border-transparent'
-                  : 'border border-slate-200 dark:border-[#262A36]'
-            } ${getBubbleRadius(isMine, isGrouped)}`}
-            style={{
-              backgroundColor: isMine ? myBg : otherBg,
-              color: isMine ? myText : otherText,
-            }}
-          >
-            {msg.replyToText && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  jumpToMessage(msg.replyToId);
-                }}
-                className="block w-full text-start px-3 py-1.5 rounded-xl bg-black/5 dark:bg-white/10 text-xs opacity-85 hover:opacity-100 cursor-pointer border-s-2 border-black/15 dark:border-white/25"
-              >
-                <div className="font-semibold text-[11px]">{msg.replyToSender}</div>
-                <div className="truncate">{msg.replyToText}</div>
-              </button>
-            )}
+        <div className={`flex flex-col min-w-0 max-w-[78%] sm:max-w-[62%] ${isMine ? 'items-end' : 'items-start'}`}>
+          {showName && (
+            <button
+              type="button"
+              onClick={() => openProfileOf(msg)}
+              className="px-3 pb-1 text-[11px] text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
+            >
+              {msg.senderName}
+            </button>
+          )}
 
-            {msg.imageUrl && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setLightboxImage(msg.imageUrl || null);
-                }}
-                className="block rounded-xl overflow-hidden border border-black/10 dark:border-white/10 cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-violet-400"
-              >
-                <img
-                  src={msg.imageUrl}
-                  alt={msg.text || t.photoSentPreview}
-                  referrerPolicy="no-referrer"
-                  loading="lazy"
-                  className="max-h-72 w-auto max-w-full object-cover"
-                />
-              </button>
-            )}
+          {/* Quoted message ("replied to …") */}
+          {msg.replyToText && (
+            <button
+              type="button"
+              onClick={() => jumpToMessage(msg.replyToId)}
+              className={`max-w-full mb-[-10px] pb-3 pt-1.5 px-3 rounded-[18px] text-[12px] text-start cursor-pointer bg-[var(--surface-2)] text-slate-500 dark:text-slate-400 border border-slate-200/70 dark:border-white/[0.06] ${
+                isMine ? 'me-1' : 'ms-1'
+              }`}
+            >
+              <span className="block text-[10.5px] font-semibold opacity-80">↩ {msg.replyToSender}</span>
+              <span className="block truncate max-w-[16rem]">{msg.replyToText}</span>
+            </button>
+          )}
 
-            {msg.audioUrl && (
-              <VoiceNote
-                src={msg.audioUrl}
-                duration={msg.audioDuration}
-                unsupportedLabel={t.voiceCantPlay}
-                downloadLabel={t.voiceDownload}
-                isMine={isMine}
-                accent={settings.primaryColor}
-              />
-            )}
-
-            {editingMsgId === msg.id ? (
-              <div className="space-y-2 min-w-[200px]" onClick={(e) => e.stopPropagation()}>
-                <input
-                  type="text"
-                  value={editValue}
-                  autoFocus
-                  maxLength={VALIDATION_LIMITS.MAX_MESSAGE_LEN}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      void handleSaveEdit(msg);
-                    } else if (e.key === 'Escape') {
-                      setEditingMsgId(null);
+          {/* Bubble line: bubble + hover tools (desktop) */}
+          <div className={`relative flex items-center gap-1 max-w-full ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
+            <div
+              onPointerDown={(e) => onBubblePointerDown(e, msg)}
+              onPointerMove={onBubblePointerMove}
+              onPointerUp={(e) => onBubblePointerUp(e, msg)}
+              onPointerCancel={onBubblePointerCancel}
+              onClick={() => onBubbleTap(msg)}
+              onDoubleClick={() => likeMessage(msg)}
+              onContextMenu={(e) => {
+                if (window.matchMedia?.('(pointer: coarse)').matches) e.preventDefault();
+              }}
+              style={
+                imageOnly
+                  ? { touchAction: 'pan-y' }
+                  : {
+                      touchAction: 'pan-y',
+                      backgroundColor: isMine ? myBg : otherBg,
+                      color: isMine ? myText : otherText,
                     }
+              }
+              className={`relative max-w-full [@media(pointer:coarse)]:select-none transition-[box-shadow] ${
+                imageOnly ? 'rounded-[20px] overflow-hidden' : `px-3.5 py-2 text-[0.94rem] leading-[1.45] space-y-1.5 ${bubbleRadius(isMine, pos)}`
+              } ${isAccepted ? 'ring-2 ring-amber-400/90 ring-offset-2 ring-offset-[var(--surface)]' : ''} ${
+                highlightId === msg.id ? 'ring-4 ring-[var(--primary)]/35' : ''
+              }`}
+            >
+              {msg.imageUrl && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLightboxImage(msg.imageUrl || null);
                   }}
-                  className="w-full px-3 py-1.5 rounded-lg text-xs bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-600"
+                  className={`block overflow-hidden cursor-zoom-in focus:outline-none ${imageOnly ? '' : 'rounded-[14px] -mx-1.5 mt-0.5'}`}
+                >
+                  <img
+                    src={msg.imageUrl}
+                    alt={msg.text || t.photoSentPreview}
+                    referrerPolicy="no-referrer"
+                    loading="lazy"
+                    draggable={false}
+                    className="max-h-80 w-auto max-w-full object-cover"
+                  />
+                </button>
+              )}
+
+              {msg.audioUrl && (
+                <VoiceNote
+                  src={msg.audioUrl}
+                  duration={msg.audioDuration}
+                  unsupportedLabel={t.voiceCantPlay}
+                  downloadLabel={t.voiceDownload}
+                  isMine={isMine}
+                  accent={settings.primaryColor}
                 />
-                <div className="flex items-center justify-end gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setEditingMsgId(null)}
-                    className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-black/10 dark:bg-white/10 cursor-pointer"
-                  >
-                    {t.cancelAction}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSaveEdit(msg)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-white text-slate-900 cursor-pointer"
-                  >
-                    <Check className="w-3 h-3" />
-                    <span>{t.saveAction}</span>
-                  </button>
+              )}
+
+              {isEditing ? (
+                <div className="space-y-2 min-w-[220px]" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+                  <textarea
+                    value={editValue}
+                    autoFocus
+                    rows={2}
+                    maxLength={VALIDATION_LIMITS.MAX_MESSAGE_LEN}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        void handleSaveEdit(msg);
+                      } else if (e.key === 'Escape') {
+                        setEditingMsgId(null);
+                      }
+                    }}
+                    className="w-full px-3 py-2 rounded-xl text-sm bg-white/95 dark:bg-black/40 text-slate-900 dark:text-slate-100 resize-none focus:outline-none"
+                  />
+                  <div className="flex items-center justify-end gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setEditingMsgId(null)}
+                      className="px-3 py-1 rounded-full text-xs font-medium bg-black/10 dark:bg-white/10 cursor-pointer"
+                    >
+                      {t.cancelAction}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveEdit(msg)}
+                      className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-white text-slate-900 cursor-pointer"
+                    >
+                      <Check className="w-3 h-3" />
+                      {t.saveAction}
+                    </button>
+                  </div>
                 </div>
+              ) : msg.text ? (
+                <div className="whitespace-pre-wrap break-words" dir="auto">
+                  {renderRichText(msg.text, isMine, t.copyAction, t.copiedToast)}
+                </div>
+              ) : null}
+
+              {heartBurstId === msg.id && (
+                <span className="heart-burst pointer-events-none absolute inset-0 flex items-center justify-center text-4xl" aria-hidden="true">
+                  ❤️
+                </span>
+              )}
+            </div>
+
+            {/* Hover tools (mouse only) */}
+            <div className="hidden [@media(hover:hover)]:flex items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
+              <button type="button" onClick={() => setReactPickerFor((c) => (c === msg.id ? null : msg.id))} title={t.reactAction} aria-label={t.reactAction} className={hoverBtn}>
+                <SmilePlus className="w-4 h-4" />
+              </button>
+              <button type="button" onClick={() => startReply(msg)} title={t.replyAction} aria-label={t.replyAction} className={hoverBtn}>
+                <Reply className="w-4 h-4" />
+              </button>
+              <button type="button" onClick={() => setSheetMsg(msg)} title={t.moreActions} aria-label={t.moreActions} className={hoverBtn}>
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+            </div>
+
+            {reactPickerFor === msg.id && (
+              <div
+                className={`pop-in absolute bottom-full mb-2 z-30 flex items-center gap-0.5 p-1.5 rounded-full bg-[var(--surface)] border border-slate-200 dark:border-white/10 shadow-xl ${
+                  isMine ? 'end-0' : 'start-0'
+                }`}
+              >
+                {QUICK_REACTIONS.map((em) => (
+                  <button
+                    key={em}
+                    type="button"
+                    onClick={() => handleToggleReaction(msg, em)}
+                    className={`w-10 h-10 rounded-full text-[22px] flex items-center justify-center cursor-pointer transition-transform hover:scale-125 ${
+                      msg.reactions?.[myUid] === em ? 'bg-[var(--primary-soft)]' : ''
+                    }`}
+                  >
+                    {em}
+                  </button>
+                ))}
               </div>
-            ) : msg.text ? (
-              <div className="whitespace-pre-wrap break-words" dir="auto">
-                {renderRichText(msg.text, isMine, t.copyAction, t.copiedToast)}
-              </div>
-            ) : null}
+            )}
           </div>
 
           {renderReactions(msg, isMine)}
-          {mode === 'room' && !msg.replyToId && (replyCounts[msg.id] || isOpenQuestion(msg)) && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setActionsOpenFor(null);
-                setThreadQuestion(msg);
-              }}
-              className={`mt-1 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border cursor-pointer transition-colors ${
-                threadQuestion?.id === msg.id
-                  ? 'bg-[var(--primary)] text-white border-transparent'
-                  : 'bg-white/80 dark:bg-[#1E2230] border-slate-200 dark:border-slate-700 text-violet-700 dark:text-violet-300 hover:border-violet-300'
-              }`}
-            >
-              <span aria-hidden="true">💬</span>
-              {replyCounts[msg.id]
-                ? repliesLabel(replyCounts[msg.id], isRtl ? 'ar' : 'en')
-                : t.threadAnswerCta}
-            </button>
-          )}
-          {isGrouped && (
-            <span className={`h-0 overflow-visible text-[10px] tabular-nums text-slate-400 transition-opacity px-1.5 ${actionsVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-              {formatTime(msg)}
-            </span>
-          )}
-        </div>
 
-        {/* Action controls (hover on desktop, tap bubble on mobile) */}
-        <div
-          className={`relative transition-opacity flex items-center gap-1 sm:pb-1 max-sm:basis-full max-sm:flex-wrap max-sm:mt-1.5 ${
-            isMine ? 'max-sm:justify-end' : 'max-sm:ps-10'
-          } ${
-            actionsVisible
-              ? 'opacity-100 msg-in'
-              : 'max-sm:hidden opacity-0 group-hover:opacity-100 focus-within:opacity-100'
-          }`}
-        >
-          {confirmDeleteId === msg.id ? (
-            <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-white dark:bg-[#1E2230] border border-rose-200 dark:border-rose-800 shadow-sm">
-              <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-300 whitespace-nowrap">
-                {t.confirmDeleteQuestion}
-              </span>
-              <button
-                type="button"
-                onClick={() => handleDeleteMessage(msg.id)}
-                className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-rose-500 text-white hover:bg-rose-600 cursor-pointer"
-              >
-                {t.confirmDeleteYes}
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmDeleteId(null)}
-                aria-label={t.cancelAction}
-                className="p-0.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => setReactPickerFor((cur) => (cur === msg.id ? null : msg.id))}
-                title={t.reactAction}
-                className={actionBtn}
-              >
-                <SmilePlus className="w-3.5 h-3.5" />
-              </button>
-              {mode === 'room' && isMine && (
+          {/* Under the bubble: badges, answers, time */}
+          {(msg.solved || isAccepted || hasThreadChip || pos === 'last' || pos === 'single') && (
+            <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 px-2 text-[11px] text-slate-400 dark:text-slate-500 ${isMine ? 'justify-end' : ''}`}>
+              {msg.solved && <span className="font-semibold text-emerald-600 dark:text-emerald-400">✅ {t.solvedBadge}</span>}
+              {isAccepted && <span className="font-semibold text-amber-600 dark:text-amber-400">⭐ {t.bestAnswerBadge}</span>}
+              {hasThreadChip && (
                 <button
                   type="button"
-                  onClick={() => toggleSolved(msg)}
-                  title={msg.solved ? t.unmarkSolved : t.markSolved}
-                  className={`${actionBtn} ${msg.solved ? '!text-emerald-600' : 'hover:!text-emerald-600'}`}
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                </button>
-              )}
-              {canPickBest && question && (
-                <button
-                  type="button"
-                  onClick={() => pickBestAnswer(question, msg)}
-                  title={isAccepted ? t.unmarkBestAnswer : t.markBestAnswer}
-                  className={`${actionBtn} ${isAccepted ? '!text-amber-500' : 'hover:!text-amber-500'}`}
-                >
-                  <Award className="w-3.5 h-3.5" />
-                </button>
-              )}
-              {!isMine && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActionsOpenFor(null);
-                    setReportTarget({
-                      uid: msg.senderUid,
-                      name: msg.senderName,
-                      nickname: msg.senderNickname,
-                      roomId: mode === 'room' ? targetId : undefined,
-                      chatId: mode === 'direct' ? targetId : undefined,
-                      messageId: msg.id,
-                      messageText: msg.text || (msg.audioUrl ? t.voiceMessage : msg.imageUrl ? t.photoSentPreview : ''),
-                    });
-                  }}
-                  title={t.reportAction}
-                  className={`${actionBtn} hover:!text-rose-500`}
-                >
-                  <Flag className="w-3.5 h-3.5" />
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  setReplyTo(msg);
-                  setActionsOpenFor(null);
-                  composerRef.current?.focus();
-                }}
-                title={t.replyAction}
-                className={actionBtn}
-              >
-                <Reply className="w-3.5 h-3.5" />
-              </button>
-              {msg.text && (
-                <button
-                  type="button"
-                  onClick={() => handleCopy(msg)}
-                  title={copiedId === msg.id ? t.copiedToast : t.copyAction}
-                  className={actionBtn}
-                >
-                  {copiedId === msg.id ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-500" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5" />
-                  )}
-                </button>
-              )}
-              {isMine && !msg.audioUrl && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingMsgId(msg.id);
-                    setEditValue(msg.text);
-                    setActionsOpenFor(null);
-                  }}
-                  title={t.editAction}
-                  className={actionBtn}
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                </button>
-              )}
-              {canModify && (
-                <button
-                  type="button"
-                  onClick={() => setConfirmDeleteId(msg.id)}
-                  title={t.deleteAction}
-                  className={`${actionBtn} !text-rose-500 hover:!text-rose-600`}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </>
-          )}
-
-          {reactPickerFor === msg.id && (
-            <div
-              className={`pop-in absolute bottom-full mb-1.5 z-20 flex items-center gap-0.5 p-1 rounded-full glass-strong border border-slate-200 dark:border-slate-700 shadow-lg ${
-                isMine ? 'end-0' : 'start-0'
-              }`}
-            >
-              {REACTION_EMOJIS.map((em) => (
-                <button
-                  key={em}
-                  type="button"
-                  onClick={() => handleToggleReaction(msg, em)}
-                  className={`w-9 h-9 rounded-full text-lg flex items-center justify-center cursor-pointer hover:bg-amber-50 dark:hover:bg-slate-800 transition-transform hover:scale-125 ${
-                    msg.reactions?.[myUid] === em ? 'bg-violet-100 dark:bg-violet-900/50' : ''
+                  onClick={() => setThreadQuestion(msg)}
+                  className={`font-semibold cursor-pointer hover:underline ${
+                    threadQuestion?.id === msg.id ? 'text-[var(--primary)]' : 'text-slate-500 dark:text-slate-400'
                   }`}
                 >
-                  {em}
+                  💬 {replyCounts[msg.id] ? repliesLabel(replyCounts[msg.id], isRtl ? 'ar' : 'en') : t.threadAnswerCta}
                 </button>
-              ))}
+              )}
+              {(pos === 'last' || pos === 'single') && (
+                <span className="tabular-nums">
+                  {formatTime(msg)}
+                  {isEdited ? ` · ${t.editedTag}` : ''}
+                </span>
+              )}
             </div>
           )}
+        </div>
+      </div>
+    );
+  });
+
+  // Typing bubble at the end of the conversation
+  if (typingLabel) {
+    streamItems.push(
+      <div key="typing" className="flex items-end gap-2 mt-3 msg-in" aria-live="polite">
+        <span className="w-7 shrink-0" />
+        <div className="flex flex-col items-start gap-1">
+          <div className="px-4 py-3 rounded-[22px] flex items-center gap-1" style={{ backgroundColor: otherBg }}>
+            <span className="typing-dot" />
+            <span className="typing-dot [animation-delay:150ms]" />
+            <span className="typing-dot [animation-delay:300ms]" />
+          </div>
+          <span className="px-2 text-[11px] text-slate-400">{typingLabel}</span>
         </div>
       </div>
     );
@@ -1437,7 +1429,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto overscroll-contain pastel-scroll px-2.5 sm:px-6 lg:px-10 pt-14 pb-10 sm:pb-4"
+        className="flex-1 overflow-y-auto overscroll-contain pastel-scroll px-3 sm:px-5 lg:px-8 pt-14 pb-3"
       >
         {loading ? (
           <div className="h-full flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">
@@ -1493,20 +1485,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
       )}
 
       {/* Composer */}
-      <div className="px-2.5 sm:px-6 lg:px-10 pb-safe-sm sm:pb-4 pt-1 bg-gradient-to-t from-[var(--app-bg)] via-[var(--app-bg)]/80 to-transparent">
-        <div className="h-5 px-2 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5" aria-live="polite">
-          {typingLabel && (
-            <>
-              <span className="inline-flex gap-0.5" aria-hidden="true">
-                <span className="w-1 h-1 rounded-full bg-current animate-bounce [animation-delay:-0.3s]" />
-                <span className="w-1 h-1 rounded-full bg-current animate-bounce [animation-delay:-0.15s]" />
-                <span className="w-1 h-1 rounded-full bg-current animate-bounce" />
-              </span>
-              <span className="truncate">{typingLabel}</span>
-            </>
-          )}
-        </div>
-
+      <div className="shrink-0 px-3 sm:px-4 pb-safe-sm sm:pb-4 pt-2 bg-[var(--surface)]">
         {photoError && (
           <div className="mb-2 px-4 py-2 rounded-2xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-xs text-rose-700 dark:text-rose-300">
             {photoError}
@@ -1514,7 +1493,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         )}
 
         {attachedPhoto && (
-          <div className="msg-in glass-strong mb-2 p-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3 w-fit shadow-sm">
+          <div className="msg-in mb-2 p-2 rounded-2xl bg-[var(--surface-2)] flex items-center justify-between gap-3 w-fit">
             <div className="flex items-center gap-3">
               <img
                 src={attachedPhoto}
@@ -1536,12 +1515,12 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         )}
 
         {replyTo && (
-          <div className="msg-in glass-strong mb-2 px-4 py-2 rounded-2xl border border-slate-200 dark:border-slate-700 border-s-4 !border-s-violet-300 dark:!border-s-violet-500/60 flex items-center justify-between gap-3 text-xs shadow-sm">
-            <div className="min-w-0 truncate">
-              <span className="font-semibold text-slate-700 dark:text-slate-200">
-                {t.replyingTo} {replyTo.senderName}:{' '}
-              </span>
-              <span className="text-slate-500 dark:text-slate-400">{replyTo.text || (replyTo.audioUrl ? t.voiceMessage : t.photoSentPreview)}</span>
+          <div className="msg-in mb-2 ps-4 pe-2 py-2 flex items-center justify-between gap-3 text-xs">
+            <div className="min-w-0">
+              <div className="font-semibold text-slate-900 dark:text-slate-100">
+                {t.replyingTo} {replyTo.senderUid === myUid ? t.youLabel : replyTo.senderName}
+              </div>
+              <div className="truncate text-slate-500 dark:text-slate-400">{replyTo.text || (replyTo.audioUrl ? t.voiceMessage : t.photoSentPreview)}</div>
             </div>
             <button
               type="button"
@@ -1555,7 +1534,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         )}
 
         {showEmojiTray && (
-          <div className="msg-in glass-strong mb-2 p-2 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-wrap items-center gap-1 w-fit max-w-full shadow-md">
+          <div className="msg-in mb-2 p-1.5 rounded-full bg-[var(--surface)] border border-slate-200 dark:border-white/10 flex flex-wrap items-center gap-0.5 w-fit max-w-full shadow-lg">
             {QUICK_EMOJIS.map((em) => (
               <button
                 key={em}
@@ -1564,7 +1543,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
                   setText((prev) => `${prev}${em}`);
                   composerRef.current?.focus();
                 }}
-                className="w-9 h-9 rounded-xl hover:bg-amber-50 dark:hover:bg-slate-800 text-lg flex items-center justify-center cursor-pointer transition-transform hover:scale-110"
+                className="w-10 h-10 rounded-full hover:bg-[var(--surface-2)] text-[22px] flex items-center justify-center cursor-pointer transition-transform hover:scale-110 active:scale-90"
               >
                 {em}
               </button>
@@ -1624,7 +1603,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
           </div>
         )}
         {recording ? (
-          <div className="flex items-center gap-3 p-1.5 ps-4 rounded-2xl border border-rose-200 dark:border-rose-900/60 bg-white dark:bg-[#171A23] shadow-sm">
+          <div className="flex items-center gap-3 p-1.5 ps-4 rounded-full bg-[var(--surface-2)]">
             <span className="relative flex w-2.5 h-2.5" aria-hidden="true">
               <span className="absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75 animate-ping" />
               <span className="relative inline-flex w-2.5 h-2.5 rounded-full bg-rose-500" />
@@ -1646,7 +1625,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
               type="button"
               onClick={() => finishRecording(false)}
               title={t.voiceSend}
-              className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl text-xs font-semibold text-white cursor-pointer hover:brightness-110"
+              className="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-full text-xs font-semibold text-white cursor-pointer hover:brightness-110 active:scale-95 transition-transform"
               style={{ background: gradient }}
             >
               <Square className="w-3.5 h-3.5 fill-current" />
@@ -1656,7 +1635,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         ) : (
         <form
           onSubmit={handleSend}
-          className="glass-strong flex items-end gap-1 sm:gap-1.5 p-1.5 ps-1.5 sm:ps-2 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-sm dark:shadow-sm focus-within:ring-4 focus-within:ring-violet-200/50 dark:focus-within:ring-violet-500/15 transition-shadow"
+          className="flex items-end gap-1 p-1.5 rounded-[26px] bg-[var(--surface-2)] border border-transparent focus-within:border-slate-300 dark:focus-within:border-white/15 transition-colors"
         >
           <input ref={photoInputRef} type="file" accept="image/*" onChange={handleFileInputChange} className="hidden" />
 
@@ -1664,22 +1643,11 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
             type="button"
             onClick={() => photoInputRef.current?.click()}
             title={t.attachPhoto}
-            className="p-2.5 rounded-full text-slate-500 hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300 hover:bg-violet-50 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+            aria-label={t.attachPhoto}
+            className="w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0 cursor-pointer active:scale-90 transition-transform"
+            style={{ background: gradient }}
           >
-            <ImagePlus className="w-4 h-4" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowEmojiTray((v) => !v)}
-            title={t.quickEmojisLabel}
-            className={`p-2.5 rounded-full transition-colors cursor-pointer shrink-0 ${
-              showEmojiTray
-                ? 'text-amber-600 bg-amber-50 dark:text-amber-300 dark:bg-slate-800'
-                : 'text-slate-500 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Smile className="w-4 h-4" />
+            <Camera className="w-[18px] h-[18px]" />
           </button>
 
           <textarea
@@ -1694,30 +1662,50 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
             onBlur={() => clearTyping(targetId)}
             placeholder={t.typeMessagePlaceholder}
             title={`${t.composerHint}\n${t.formatHint}`}
-            className="flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-relaxed text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none min-w-0 max-h-36 pastel-scroll"
+            onFocus={autoGrow}
+            className="flex-1 min-h-[36px] resize-none bg-transparent px-2 py-[7px] text-[15px] leading-[1.45] text-slate-900 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-500 focus:outline-none min-w-0 max-h-36 pastel-scroll"
           />
 
           {!text.trim() && !attachedPhoto ? (
-            <button
-              type="button"
-              onClick={startRecording}
-              disabled={sending}
-              title={t.voiceRecord}
-              aria-label={t.voiceRecord}
-              className="inline-flex items-center justify-center h-10 w-10 rounded-xl text-white transition-all hover:brightness-110 active:scale-95 disabled:opacity-40 cursor-pointer shrink-0"
-              style={{ background: gradient }}
-            >
-              <Mic className="w-4 h-4" />
-            </button>
+            <div className="flex items-center shrink-0">
+              <button
+                type="button"
+                onClick={startRecording}
+                disabled={sending}
+                title={t.voiceRecord}
+                aria-label={t.voiceRecord}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-slate-800 dark:text-slate-100 hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-40 cursor-pointer active:scale-90 transition-transform"
+              >
+                <Mic className="w-[22px] h-[22px] stroke-[1.8]" />
+              </button>
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                title={t.attachPhoto}
+                aria-label={t.attachPhoto}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-slate-800 dark:text-slate-100 hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer active:scale-90 transition-transform"
+              >
+                <ImagePlus className="w-[22px] h-[22px] stroke-[1.8]" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowEmojiTray((v) => !v)}
+                title={t.quickEmojisLabel}
+                aria-label={t.quickEmojisLabel}
+                className={`w-9 h-9 rounded-full flex items-center justify-center cursor-pointer active:scale-90 transition-transform ${
+                  showEmojiTray ? 'text-[var(--primary)]' : 'text-slate-800 dark:text-slate-100 hover:bg-black/5 dark:hover:bg-white/10'
+                }`}
+              >
+                <Smile className="w-[22px] h-[22px] stroke-[1.8]" />
+              </button>
+            </div>
           ) : (
             <button
               type="submit"
               disabled={sending}
-              className="inline-flex items-center justify-center gap-2 h-10 min-w-10 px-3 sm:px-4 rounded-xl text-xs font-semibold text-white transition-all hover:brightness-110 active:scale-95 disabled:opacity-40 cursor-pointer shrink-0"
-              style={{ background: gradient }}
+              className="h-9 px-3 rounded-full text-[15px] font-semibold text-[var(--primary)] hover:text-[var(--primary-hover)] disabled:opacity-40 cursor-pointer shrink-0 send-pop"
             >
-              <span className="hidden sm:inline">{t.sendMessage}</span>
-              <Send className="w-4 h-4 rtl:-scale-x-100" />
+              {t.sendMessage}
             </button>
           )}
         </form>
@@ -1751,6 +1739,76 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
           }}
         />
       )}
+
+      {sheetMsg && (() => {
+        const m = messages.find((x) => x.id === sheetMsg.id) ?? sheetMsg;
+        const mine = m.senderUid === myUid;
+        const q = m.replyToId ? msgById.get(m.replyToId) : undefined;
+        const d = m.createdAt?.toDate?.();
+        return (
+          <MessageSheet
+            msg={m}
+            myUid={myUid}
+            timeLabel={d ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(d) : '···'}
+            labels={{
+              reply: t.replyAction,
+              copy: t.copyAction,
+              copied: t.copiedToast,
+              edit: t.editAction,
+              delete: t.deleteAction,
+              confirmDelete: t.confirmDeleteQuestion,
+              cancel: t.cancelAction,
+              report: t.reportAction,
+              thread: t.threadTitle,
+              markSolved: t.markSolved,
+              unmarkSolved: t.unmarkSolved,
+              markBest: t.markBestAnswer,
+              unmarkBest: t.unmarkBestAnswer,
+            }}
+            canEdit={mine && !m.audioUrl}
+            canDelete={mine || (mode === 'room' && isAdmin)}
+            canReport={!mine}
+            canToggleSolved={mode === 'room' && mine && !m.replyToId}
+            canPickBest={mode === 'room' && !mine && q?.senderUid === myUid}
+            isBest={mode === 'room' && acceptedIds.has(m.id)}
+            showThread={mode === 'room' && !m.replyToId}
+            onReact={(em) => void handleToggleReaction(m, em)}
+            onReply={() => startReply(m)}
+            onCopy={() => handleCopy(m)}
+            onEdit={() => {
+              setEditingMsgId(m.id);
+              setEditValue(m.text);
+              setSheetMsg(null);
+            }}
+            onDelete={() => void handleDeleteMessage(m.id)}
+            onReport={() => {
+              setSheetMsg(null);
+              setReportTarget({
+                uid: m.senderUid,
+                name: m.senderName,
+                nickname: m.senderNickname,
+                roomId: mode === 'room' ? targetId : undefined,
+                chatId: mode === 'direct' ? targetId : undefined,
+                messageId: m.id,
+                messageText: m.text || (m.audioUrl ? t.voiceMessage : m.imageUrl ? t.photoSentPreview : ''),
+              });
+            }}
+            onThread={() => {
+              setSheetMsg(null);
+              setThreadQuestion(m);
+            }}
+            onToggleSolved={() => {
+              setSheetMsg(null);
+              void toggleSolved(m);
+            }}
+            onPickBest={() => {
+              setSheetMsg(null);
+              if (q) void pickBestAnswer(q, m);
+            }}
+            onClose={closeSheet}
+          />
+        );
+      })()}
 
       {profileTarget && (
         <ProfileCard

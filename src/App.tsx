@@ -91,6 +91,26 @@ function MacaronApp() {
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, []);
+  // Phones: keep the app exactly as tall as the visible area, so the on-screen
+  // keyboard never covers the composer (iOS Safari ignores dvh for the keyboard)
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement;
+    const apply = () => {
+      root.style.setProperty('--app-h', `${Math.round(vv.height)}px`);
+      if (vv.offsetTop > 0) window.scrollTo(0, 0);
+    };
+    apply();
+    vv.addEventListener('resize', apply);
+    vv.addEventListener('scroll', apply);
+    return () => {
+      vv.removeEventListener('resize', apply);
+      vv.removeEventListener('scroll', apply);
+      root.style.removeProperty('--app-h');
+    };
+  }, []);
+
   const effectiveTheme: ThemeMode =
     prefs.theme === 'system' ? (systemDark ? 'dark' : 'light') : prefs.theme;
   const effectiveLanguage: Language = prefs.language ?? language;
@@ -698,7 +718,7 @@ function MacaronApp() {
 
   if (!authReady || (user && !profileReady)) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-slate-500 dark:text-slate-400">
+      <div className="min-h-dvh flex items-center justify-center text-slate-500 dark:text-slate-400">
         <div className="flex flex-col items-center gap-4">
           <span className="logo-shine inline-flex rounded-[1.1rem] shadow-lg animate-bounce [animation-duration:1.6s]">
             <MacaronLogo size={64} />

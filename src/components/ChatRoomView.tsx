@@ -278,6 +278,19 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [reactPickerFor, setReactPickerFor] = useState<string | null>(null);
   const [actionsOpenFor, setActionsOpenFor] = useState<string | null>(null);
+  // Tap anywhere outside the open message closes its action bar / emoji picker (phones)
+  useEffect(() => {
+    const openId = actionsOpenFor ?? reactPickerFor;
+    if (!openId) return;
+    const onDown = (e: PointerEvent) => {
+      const row = (e.target as Element | null)?.closest?.('[data-msg-id]');
+      if (row?.getAttribute('data-msg-id') === openId) return;
+      setActionsOpenFor(null);
+      setReactPickerFor(null);
+    };
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
+  }, [actionsOpenFor, reactPickerFor]);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -746,7 +759,8 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
   const fmtSecs = (secs: number) => `${Math.floor(secs / 60)}:${String(Math.floor(secs % 60)).padStart(2, '0')}`;
 
   const handleComposerKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    const enterSends = getPrefs().enterToSend;
+    const isTouch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
+    const enterSends = getPrefs().enterToSend && !isTouch;
     const isSendCombo = enterSends
       ? e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing
       : e.key === 'Enter' && (e.ctrlKey || e.metaKey);
@@ -921,7 +935,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
   };
 
   const actionBtn =
-    'p-1.5 rounded-full glass-strong border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-violet-600 dark:hover:text-violet-300 shadow-xs hover:shadow-sm cursor-pointer transition-all';
+    'p-2 sm:p-1.5 rounded-full glass-strong border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-violet-600 dark:hover:text-violet-300 shadow-xs hover:shadow-sm cursor-pointer transition-all';
 
   const renderReactions = (msg: ChatMessage, isMine: boolean) => {
     const entries = Object.entries(msg.reactions ?? {});
@@ -1007,35 +1021,35 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
       <div
         key={msg.id}
         data-msg-id={msg.id}
-        className={`msg-in group flex items-end gap-2.5 rounded-2xl transition-colors duration-500 ${
+        className={`msg-in group relative flex max-sm:flex-wrap items-end gap-2 sm:gap-2.5 rounded-2xl transition-colors duration-500 ${
           isMine ? 'flex-row-reverse' : 'flex-row'
         } ${isGrouped ? 'mt-1' : 'mt-4'} ${
           highlightId === msg.id ? 'bg-amber-100/70 dark:bg-amber-500/15 ring-4 ring-amber-100/70 dark:ring-amber-500/15' : ''
         }`}
       >
         {isGrouped ? (
-          <span className="w-9 shrink-0" aria-hidden="true" />
+          <span className={`w-8 sm:w-9 shrink-0 ${isMine ? 'max-sm:hidden' : ''}`} aria-hidden="true" />
         ) : (
           <AvatarImg
             src={msg.senderPhoto}
             name={msg.senderName}
-            sizeClass="w-9 h-9"
-            className="shadow-sm ring-2 ring-white dark:ring-[#171A23]"
+            sizeClass="w-8 h-8 sm:w-9 sm:h-9"
+            className={`shadow-sm ring-2 ring-white dark:ring-[#171A23] ${isMine ? 'max-sm:hidden' : ''}`}
           />
         )}
 
-        <div className={`flex flex-col max-w-[78%] sm:max-w-[65%] ${isMine ? 'items-end' : 'items-start'}`}>
+        <div className={`flex flex-col min-w-0 ${isMine ? 'max-w-[85%]' : 'max-w-[80%]'} sm:max-w-[65%] ${isMine ? 'items-end' : 'items-start'}`}>
           {/* Metadata */}
           <div
-            className={`flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mb-1 px-1.5 ${
+            className={`flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400 mb-1 px-1.5 ${
               isGrouped && !msg.solved && !isAccepted ? 'hidden' : ''
             }`}
           >
             <span className="font-semibold text-slate-700 dark:text-slate-200">
               {isMine ? t.youLabel : msg.senderName}
             </span>
-            <span aria-hidden="true">·</span>
-            <span dir="ltr">@{msg.senderNickname}</span>
+            <span aria-hidden="true" className="hidden sm:inline">·</span>
+            <span dir="ltr" className="hidden sm:inline">@{msg.senderNickname}</span>
             <span aria-hidden="true">·</span>
             <span className="tabular-nums">{formatTime(msg)}</span>
             {isEdited && (
@@ -1059,7 +1073,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
           {/* Bubble */}
           <div
             onClick={() => setActionsOpenFor((cur) => (cur === msg.id ? null : msg.id))}
-            className={`relative px-4 py-2.5 text-[0.9rem] leading-relaxed space-y-2 shadow-[0_1px_2px_rgba(15,23,42,0.06)] ${
+            className={`relative max-w-full px-3.5 sm:px-4 py-2.5 text-[0.9rem] leading-relaxed space-y-2 shadow-[0_1px_2px_rgba(15,23,42,0.06)] ${
               isAccepted
                 ? 'border-2 border-amber-300 dark:border-amber-500/60'
                 : isMine
@@ -1160,7 +1174,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
 
           {renderReactions(msg, isMine)}
           {isGrouped && (
-            <span className="h-0 overflow-visible text-[10px] tabular-nums text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity px-1.5">
+            <span className={`h-0 overflow-visible text-[10px] tabular-nums text-slate-400 transition-opacity px-1.5 ${actionsVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
               {formatTime(msg)}
             </span>
           )}
@@ -1168,8 +1182,12 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
 
         {/* Action controls (hover on desktop, tap bubble on mobile) */}
         <div
-          className={`relative transition-opacity flex items-center gap-1 pb-1 ${
-            actionsVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
+          className={`relative transition-opacity flex items-center gap-1 sm:pb-1 max-sm:basis-full max-sm:flex-wrap max-sm:mt-1.5 ${
+            isMine ? 'max-sm:justify-end' : 'max-sm:ps-10'
+          } ${
+            actionsVisible
+              ? 'opacity-100 msg-in'
+              : 'max-sm:hidden opacity-0 group-hover:opacity-100 focus-within:opacity-100'
           }`}
         >
           {confirmDeleteId === msg.id ? (
@@ -1325,7 +1343,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
   return (
     <div style={backdropStyle} className="flex-1 flex flex-col min-h-0 relative">
       {/* Search in conversation */}
-      <div className="absolute top-3 end-4 z-20 flex items-center gap-2">
+      <div className="absolute top-2.5 sm:top-3 end-3 sm:end-4 z-20 flex items-center gap-2 max-w-[calc(100%-1.5rem)]">
         {searchOpen && (
           <div className="msg-in glass-strong flex items-center gap-2 ps-3.5 pe-2 py-2 rounded-full border border-slate-200 dark:border-slate-700 shadow-md">
             <input
@@ -1340,7 +1358,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
                 }
               }}
               placeholder={t.searchMessagesPlaceholder}
-              className="w-44 sm:w-60 bg-transparent text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none"
+              className="w-36 min-w-0 sm:w-60 bg-transparent text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none"
             />
             {normalizedQuery && (
               <span className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums whitespace-nowrap">
@@ -1366,7 +1384,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto pastel-scroll px-3 sm:px-6 lg:px-10 pt-14 pb-4"
+        className="flex-1 overflow-y-auto overscroll-contain pastel-scroll px-2.5 sm:px-6 lg:px-10 pt-14 pb-10 sm:pb-4"
       >
         {loading ? (
           <div className="h-full flex items-center justify-center text-sm text-slate-500 dark:text-slate-400">
@@ -1422,7 +1440,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
       )}
 
       {/* Composer */}
-      <div className="px-3 sm:px-6 lg:px-10 pb-4 pt-1 bg-gradient-to-t from-[var(--app-bg)] via-[var(--app-bg)]/80 to-transparent">
+      <div className="px-2.5 sm:px-6 lg:px-10 pb-safe-sm sm:pb-4 pt-1 bg-gradient-to-t from-[var(--app-bg)] via-[var(--app-bg)]/80 to-transparent">
         <div className="h-5 px-2 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5" aria-live="polite">
           {typingLabel && (
             <>
@@ -1484,7 +1502,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         )}
 
         {showEmojiTray && (
-          <div className="msg-in glass-strong mb-2 p-2 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-wrap items-center gap-1 w-fit shadow-md">
+          <div className="msg-in glass-strong mb-2 p-2 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-wrap items-center gap-1 w-fit max-w-full shadow-md">
             {QUICK_EMOJIS.map((em) => (
               <button
                 key={em}
@@ -1585,7 +1603,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
         ) : (
         <form
           onSubmit={handleSend}
-          className="glass-strong flex items-end gap-1.5 p-1.5 ps-2 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-sm dark:shadow-sm focus-within:ring-4 focus-within:ring-violet-200/50 dark:focus-within:ring-violet-500/15 transition-shadow"
+          className="glass-strong flex items-end gap-1 sm:gap-1.5 p-1.5 ps-1.5 sm:ps-2 rounded-2xl border border-slate-200 dark:border-slate-700/80 shadow-sm dark:shadow-sm focus-within:ring-4 focus-within:ring-violet-200/50 dark:focus-within:ring-violet-500/15 transition-shadow"
         >
           <input ref={photoInputRef} type="file" accept="image/*" onChange={handleFileInputChange} className="hidden" />
 

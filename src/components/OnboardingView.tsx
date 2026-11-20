@@ -173,14 +173,14 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
   return (
     <div
       style={backdropStyle}
-      className="relative min-h-screen flex flex-col overflow-hidden transition-colors duration-200"
+      className="relative min-h-dvh flex flex-col overflow-hidden transition-colors duration-200"
     >
       {/* Decorative floating pastel blobs */}
       <span aria-hidden="true" className="pastel-blob w-[28rem] h-[28rem] -top-40 -start-32" style={{ backgroundColor: settings.yellowAccent }} />
       <span aria-hidden="true" className="pastel-blob w-[26rem] h-[26rem] top-1/3 -end-40 [animation-delay:-4s]" style={{ backgroundColor: settings.pinkAccent }} />
       <span aria-hidden="true" className="pastel-blob w-[24rem] h-[24rem] -bottom-40 start-1/3 [animation-delay:-8s]" style={{ backgroundColor: settings.blueAccent }} />
       {/* Clean Single-Row Top Bar */}
-      <header className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 py-5 flex items-center justify-between gap-4">
+      <header className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 pt-safe pb-3 sm:py-5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-2.5 shrink-0">
           <span className="logo-shine inline-flex rounded-[0.75rem] shadow-md rotate-[-6deg] shrink-0">
             <MacaronLogo size={42} />
@@ -194,7 +194,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
           <button
             type="button"
             onClick={() => onToggleLanguage(isRtl ? 'en' : 'ar')}
-            className="glass inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-[#262A36] shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="glass inline-flex items-center gap-2 px-3 sm:px-4 py-2 rounded-full text-xs font-bold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-white dark:hover:bg-[#262A36] shadow-xs transition-colors whitespace-nowrap shrink-0 cursor-pointer"
           >
             <Globe className="w-3.5 h-3.5" />
             <span>{isRtl ? 'EN' : 'عربي'}</span>
@@ -221,17 +221,17 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
       </header>
 
       {/* Main 2-Column Balanced Onboarding Split */}
-      <main className="relative z-10 flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-4 lg:py-8 flex items-center">
+      <main className="relative z-10 flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 pt-1 pb-safe sm:py-4 lg:py-8 flex items-center">
         <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-8 items-stretch">
           {/* Editorial Pastel Showcase Column */}
-          <div className="msg-in glass lg:col-span-5 flex flex-col justify-between rounded-2xl border border-slate-200 dark:border-slate-700/70 p-6 lg:p-8 shadow-sm">
+          <div className="msg-in glass order-2 lg:order-none lg:col-span-5 flex flex-col justify-between rounded-2xl border border-slate-200 dark:border-slate-700/70 p-5 sm:p-6 lg:p-8 shadow-sm">
             <div className="space-y-4">
               <p className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-white/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-violet-600 dark:text-violet-300 shadow-xs w-fit">
                 <span aria-hidden="true">✨</span>
                 {t.appTagline}
               </p>
               <h1
-                className="text-3xl lg:text-4xl font-bold leading-tight text-gradient"
+                className="text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight text-gradient"
                 style={{ textWrap: 'balance' }}
               >
                 {t.welcomeHeroTitle}
@@ -289,9 +289,9 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
           </div>
 
           {/* Interactive Profile Gate Form Column */}
-          <div className="msg-in glass-strong lg:col-span-7 rounded-2xl border border-slate-200 dark:border-slate-700/70 p-6 lg:p-10 shadow-sm flex flex-col justify-center [animation-delay:80ms]">
+          <div className="msg-in glass-strong order-1 lg:order-none lg:col-span-7 rounded-2xl border border-slate-200 dark:border-slate-700/70 p-5 sm:p-6 lg:p-10 shadow-sm flex flex-col justify-center [animation-delay:80ms]">
             {!user ? (
-              <div className="flex flex-col items-center text-center gap-6 py-6 lg:py-10 max-w-sm mx-auto w-full">
+              <div className="flex flex-col items-center text-center gap-5 sm:gap-6 py-3 sm:py-6 lg:py-10 max-w-sm mx-auto w-full">
                 <span className="logo-shine inline-flex rounded-[1.55rem] shadow-xl rotate-[-6deg] hover:rotate-0 transition-transform duration-500">
                   <MacaronLogo size={88} />
                 </span>

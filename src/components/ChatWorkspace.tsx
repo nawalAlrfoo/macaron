@@ -413,9 +413,10 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         <button
           type="button"
           onClick={() => setMobileSidebarOpen(false)}
-          className="lg:hidden p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+          aria-label="Close"
+          className="lg:hidden p-2.5 -me-1.5 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
         >
-          <X className="w-4 h-4" />
+          <X className="w-5 h-5" />
         </button>
       </div>
 
@@ -727,7 +728,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   );
 
   return (
-    <div className="h-dvh w-full flex overflow-hidden">
+    <div className="h-app w-full flex overflow-hidden">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:block w-80 shrink-0 h-full relative z-10">
         {sidebarContent}
@@ -735,8 +736,8 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
       {/* Mobile Drawer */}
       {mobileSidebarOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden flex">
-          <div className="msg-in w-80 max-w-[85vw] h-full relative z-10">{sidebarContent}</div>
+        <div className="fixed inset-0 z-40 lg:hidden flex" role="dialog" aria-modal="true">
+          <div className="drawer-in w-80 max-w-[86vw] h-full relative z-10 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] bg-[var(--app-bg)] shadow-2xl">{sidebarContent}</div>
           <div
             className="flex-1 bg-slate-900/30 backdrop-blur-sm"
             onClick={() => setMobileSidebarOpen(false)}
@@ -747,8 +748,8 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 h-full">
         {/* Top Workspace Bar */}
-        <header className="glass relative z-10 px-4 sm:px-6 py-3 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between gap-4 shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
+        <header className="glass relative z-10 px-3 sm:px-6 pb-2.5 sm:pb-3 pt-safe sm:pt-3 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between gap-2 sm:gap-4 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
             <button
               type="button"
               onClick={() => setMobileSidebarOpen(true)}
@@ -768,7 +769,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                 </h2>
               </div>
             ) : activeView === 'direct' && activeDirectPeer ? (
-              <div className="flex items-center gap-3 min-w-0">
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                 <span className="relative shrink-0">
                   <AvatarImg
                     src={activeDirectPeer.photoUrl}
@@ -799,7 +800,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                     )}
                   </p>
                 </div>
-                <div className="flex items-center gap-1 ms-1 shrink-0">
+                <div className="flex items-center gap-0.5 sm:gap-1 ms-auto sm:ms-1 shrink-0">
                   <button
                     type="button"
                     onClick={() =>
@@ -855,7 +856,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
             ) : null}
           </div>
 
-          <div className="flex items-center gap-1 p-1 rounded-full bg-white/70 dark:bg-[#11131A] border border-slate-200 dark:border-slate-700 shadow-xs shrink-0">
+          <div className="hidden sm:flex items-center gap-1 p-1 rounded-full bg-white/70 dark:bg-[#11131A] border border-slate-200 dark:border-slate-700 shadow-xs shrink-0">
             <button
               type="button"
               onClick={() => onChangeLanguage(isRtl ? 'en' : 'ar')}
@@ -976,8 +977,8 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       )}
 
       {confirmBlockUid && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" onClick={() => setConfirmBlockUid(null)}>
-          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm msg-in rounded-2xl border border-slate-200 dark:border-[#262A36] bg-white dark:bg-[#171A23] shadow-xl p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-slate-900/40 backdrop-blur-sm" onClick={() => setConfirmBlockUid(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full sm:max-w-sm sheet-in rounded-t-3xl sm:rounded-2xl pb-safe sm:pb-6 border border-slate-200 dark:border-[#262A36] bg-white dark:bg-[#171A23] shadow-xl p-6 space-y-4">
             <h2 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-50">
               <Ban className="w-4 h-4 text-rose-500" />
               {t.blockConfirmTitle}

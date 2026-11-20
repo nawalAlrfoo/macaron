@@ -61,11 +61,11 @@ export const ReportDialog: React.FC<ReportDialogProps> = ({ language, myUid, tar
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-slate-900/40 backdrop-blur-sm" onClick={onClose}>
       <form
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md msg-in rounded-2xl border border-slate-200 dark:border-[#262A36] bg-white dark:bg-[#171A23] shadow-xl p-6 space-y-4"
+        className="w-full sm:max-w-md max-h-[92dvh] overflow-y-auto overscroll-contain sheet-in rounded-t-3xl sm:rounded-2xl border border-slate-200 dark:border-[#262A36] bg-white dark:bg-[#171A23] shadow-xl p-5 pb-safe sm:p-6 space-y-4"
       >
         <div className="flex items-start justify-between gap-4">
           <div>

@@ -24,7 +24,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       const isAr = (document.documentElement.lang || 'ar') === 'ar';
       return (
-        <div className="min-h-screen flex items-center justify-center p-6 text-slate-800 dark:text-slate-100">
+        <div className="min-h-dvh flex items-center justify-center p-6 text-slate-800 dark:text-slate-100">
           <div className="glass-strong max-w-sm w-full rounded-2xl border border-slate-200 dark:border-slate-700 p-8 shadow-sm text-center space-y-4">
             <span className="inline-block rounded-[1.2rem] shadow-md rotate-[-6deg]">
               <MacaronLogo size={64} />

@@ -207,14 +207,14 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-slate-900/40 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg max-h-[88vh] flex flex-col msg-in rounded-2xl border border-slate-200 dark:border-[#262A36] bg-[var(--app-bg)] shadow-xl overflow-hidden"
+        className="w-full sm:max-w-lg max-h-[92dvh] sm:max-h-[88vh] flex flex-col sheet-in rounded-t-3xl sm:rounded-2xl border border-slate-200 dark:border-[#262A36] bg-[var(--app-bg)] shadow-xl overflow-hidden"
       >
-        <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-slate-200 dark:border-[#262A36] bg-white dark:bg-[#171A23]">
+        <div className="flex items-center justify-between gap-4 px-5 sm:px-6 py-4 border-b border-slate-200 dark:border-[#262A36] bg-white dark:bg-[#171A23]">
           <div>
             <h2 className="text-base font-bold text-slate-900 dark:text-slate-50">{t.personalSettingsTitle}</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t.settingsSavedOnDevice}</p>
@@ -229,7 +229,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto pastel-scroll px-6 py-5 space-y-6">
+        <div className="flex-1 overflow-y-auto overscroll-contain pastel-scroll px-5 sm:px-6 pt-5 pb-safe sm:pb-5 space-y-6">
           {/* Account */}
           <div className="flex items-center gap-3 p-4 rounded-xl border border-slate-200 dark:border-[#262A36] bg-white dark:bg-[#171A23]">
             <AvatarImg src={profile.photoUrl} name={profile.name} sizeClass="w-12 h-12" />

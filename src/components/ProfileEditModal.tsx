@@ -96,8 +96,8 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/35 backdrop-blur-md">
-      <div className="w-full max-w-lg msg-in glass-strong rounded-2xl border border-slate-200 dark:border-slate-700 p-6 sm:p-7 shadow-sm space-y-5">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-slate-900/35 backdrop-blur-md">
+      <div className="w-full sm:max-w-lg max-h-[92dvh] overflow-y-auto overscroll-contain sheet-in glass-strong rounded-t-3xl sm:rounded-2xl border border-slate-200 dark:border-slate-700 p-5 pb-safe sm:p-7 shadow-sm space-y-5">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">
             {t.editProfile}

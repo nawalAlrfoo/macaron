@@ -911,16 +911,14 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
     visibleMessages.filter((m) => m.senderPhoto === '@p').map((m) => m.senderUid)
   );
 
-  const plainBackdrop = settings.chatBgStyle === DEFAULT_SITE_SETTINGS.chatBgStyle;
-  const backdropStyle: React.CSSProperties = plainBackdrop
-    ? { backgroundColor: 'var(--surface)' }
-    : resolveChatBackdropStyle(settings, themeMode);
-  const myBg = resolveBubbleSurface(settings.myBubbleColor, themeMode);
-  const defaultOther = settings.otherBubbleColor.toUpperCase() === DEFAULT_SITE_SETTINGS.otherBubbleColor.toUpperCase();
-  const otherBg = defaultOther ? 'var(--bubble-other)' : resolveBubbleSurface(settings.otherBubbleColor, themeMode);
-  const myText = getReadableTextColor(myBg);
-  const otherText = defaultOther ? (themeMode === 'dark' ? '#F2F2F5' : '#111114') : getReadableTextColor(otherBg);
-  const gradient = settings.primaryColor;
+  // Instagram-style look is fixed by the design (the brand violet from CSS), so old saved
+  // pastel colours in site settings can't override it.
+  const backdropStyle: React.CSSProperties = { backgroundColor: 'var(--surface)' };
+  const myBg = 'var(--primary)';
+  const myText = '#FFFFFF';
+  const otherBg = 'var(--bubble-other)';
+  const otherText = themeMode === 'dark' ? '#F2F2F5' : '#111114';
+  const gradient = 'var(--primary)';
 
   // ---------- Touch interactions: long-press menu, double-tap ❤️, swipe to reply ----------
   const [sheetMsg, setSheetMsg] = useState<ChatMessage | null>(null);
@@ -1228,7 +1226,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
                   unsupportedLabel={t.voiceCantPlay}
                   downloadLabel={t.voiceDownload}
                   isMine={isMine}
-                  accent={settings.primaryColor}
+                  accent={gradient}
                 />
               )}
 
@@ -1582,7 +1580,7 @@ export const ChatRoomView: React.FC<ChatRoomViewProps> = ({
                   disabled={requestBusy}
                   onClick={handleAcceptRequest}
                   className="px-4 py-2 rounded-full text-xs font-bold text-white transition-colors cursor-pointer disabled:opacity-50"
-                  style={{ backgroundColor: settings.primaryColor }}
+                  style={{ backgroundColor: gradient }}
                 >
                   {t.acceptRequest}
                 </button>
